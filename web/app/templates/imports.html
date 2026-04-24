@@ -53,8 +53,14 @@
       </select>
     </div>
     <div class="form-group" style="margin:0; min-width:180px;" id="group-date">
-      <label id="label-date">账期日期</label>
-      <input type="date" id="bill-period" class="form-control">
+      <label id="label-date">版次日期</label>
+      <select id="bill-period-select" class="form-control" style="display:none;">
+        <option value="">选择已有版次</option>
+      </select>
+      <div style="display:flex; gap:6px;">
+        <input type="date" id="bill-period" class="form-control" style="flex:1;">
+        <span id="edition-preview" class="form-control" style="flex:none; width:100px; text-align:center; background:var(--primary-light); color:var(--primary); font-weight:700; display:none;">--期</span>
+      </div>
     </div>
     <div class="form-group" style="margin:0; min-width:200px;" id="group-version-name">
       <label>版本名称</label>
@@ -170,12 +176,63 @@ function onFileTypeChange() {
   const isCargo = ft === 'cargo_status';
   const titles = { 'agent_bill': '上传代理账单', 'cargo_status': '上传货况表', 'pricing_file': '上传报价文件' };
   document.getElementById('upload-title').textContent = titles[ft] || '上传文件';
-  document.getElementById('label-date').textContent = isPricing ? '生效日期' : '账期日期';
+  document.getElementById('label-date').textContent = isPricing ? '生效日期' : '版次日期';
   document.getElementById('group-version-name').style.display = isPricing ? '' : 'none';
   document.getElementById('group-expire').style.display = isPricing ? '' : 'none';
   document.getElementById('group-customer').style.display = (isPricing || isCargo) ? 'none' : '';
 }
+
+function updateEditionPreview() {
+  const dateInput = document.getElementById('bill-period');
+  const preview = document.getElementById('edition-preview');
+  const dateStr = dateInput.value;
+  if (dateStr) {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const edition = parts[0] + parts[1] + parts[2];
+      preview.textContent = edition + '期';
+      preview.style.display = 'inline-flex';
+      preview.style.alignItems = 'center';
+      preview.style.justifyContent = 'center';
+      return;
+    }
+  }
+  preview.style.display = 'none';
+}
+
+async function loadExistingPeriods() {
+  const select = document.getElementById('bill-period-select');
+  try {
+    const periods = await apiFetch('/orders/api/periods', { method: 'GET' });
+    if (periods && periods.length > 0) {
+      select.innerHTML = '<option value="">选择已有版次</option>';
+      periods.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.date;
+        opt.textContent = `${p.full_label} (${p.order_count}条)`;
+        select.appendChild(opt);
+      });
+      select.style.display = '';
+    }
+  } catch(e) {
+    console.error('Failed to load periods:', e);
+  }
+}
+
+function onPeriodSelectChange() {
+  const select = document.getElementById('bill-period-select');
+  const dateInput = document.getElementById('bill-period');
+  if (select.value) {
+    dateInput.value = select.value;
+    updateEditionPreview();
+  }
+}
+
 onFileTypeChange();
+loadExistingPeriods();
+
+document.getElementById('bill-period')?.addEventListener('change', updateEditionPreview);
+document.getElementById('bill-period-select')?.addEventListener('change', onPeriodSelectChange);
 
 const CATEGORY_LABELS = {
   'HEAD_FREIGHT':'头程运费','TAIL_FREIGHT':'尾程运费','COD_FEE':'COD手续费',
@@ -260,7 +317,7 @@ async function confirmImport() {
   const msgEl = document.getElementById('confirm-validation-msg');
 
   const errors = [];
-  if (!bp) errors.push('请选择账期日期');
+  if (!bp) errors.push('请选择版次日期');
   if (ft === 'agent_bill' && !custId) errors.push('请选择客户');
 
   if (errors.length) {
