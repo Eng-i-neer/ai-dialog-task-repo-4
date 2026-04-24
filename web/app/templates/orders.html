@@ -88,7 +88,9 @@
       <option value="{{ r.id }}" {% if region_id == r.id %}selected{% endif %}>{{ r.name }}</option>
       {% endfor %}
     </select>
-    <input type="date" name="bill_period" class="form-control" value="{{ bill_period }}">
+    <select name="bill_period" id="bill-period-select" class="form-control">
+      <option value="">全部版次</option>
+    </select>
     <select name="category" class="form-control">
       <option value="">筛选费用标记</option>
       {% for code, label in fee_filter_options %}
@@ -211,6 +213,41 @@
 
 {% block extra_js %}
 <script>
+let currentBillPeriod = '{{ bill_period }}';
+
+async function loadPeriods(customerId = null) {
+  const select = document.getElementById('bill-period-select');
+  const currentValue = select.value || currentBillPeriod;
+  
+  let url = '/orders/api/periods';
+  if (customerId) {
+    url += `?customer_id=${customerId}`;
+  }
+  
+  try {
+    const periods = await apiFetch(url, { method: 'GET' });
+    
+    select.innerHTML = '<option value="">全部版次</option>';
+    periods.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.date;
+      opt.textContent = `${p.full_label} (${p.order_count}条)`;
+      if (p.date === currentValue) {
+        opt.selected = true;
+      }
+      select.appendChild(opt);
+    });
+  } catch(e) {
+    console.error('Failed to load periods:', e);
+  }
+}
+
+document.querySelector('select[name="customer_id"]')?.addEventListener('change', function() {
+  loadPeriods(this.value || null);
+});
+
+loadPeriods('{{ customer_id or "" }}' || null);
+
 document.getElementById('selectAll')?.addEventListener('change', function() {
   document.querySelectorAll('input[name="order_ids"]').forEach(cb => cb.checked = this.checked);
 });

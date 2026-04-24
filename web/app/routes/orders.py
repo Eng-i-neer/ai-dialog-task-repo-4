@@ -279,3 +279,33 @@ def batch_delete():
 
     db.session.commit()
     return jsonify({'success': True, 'deleted': deleted})
+
+
+@orders_bp.route('/api/periods')
+def api_periods():
+    """Get all existing bill periods (for edition selector)."""
+    customer_id = request.args.get('customer_id', type=int)
+    
+    query = db.session.query(
+        Order.bill_period,
+        func.count(Order.id).label('order_count')
+    ).filter(Order.bill_period.isnot(None))
+    
+    if customer_id:
+        query = query.filter(Order.customer_id == customer_id)
+    
+    results = query.group_by(Order.bill_period)\
+        .order_by(Order.bill_period.desc())\
+        .all()
+    
+    periods = []
+    for bp, count in results:
+        if bp:
+            periods.append({
+                'date': bp.strftime('%Y-%m-%d'),
+                'label': bp.strftime('%m%d'),
+                'full_label': bp.strftime('%m%d期'),
+                'order_count': count
+            })
+    
+    return jsonify(periods)
