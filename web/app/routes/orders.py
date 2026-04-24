@@ -52,6 +52,7 @@ def order_list():
     category_filter = request.args.get('category', '').strip()
     cargo_type_filter = request.args.get('cargo_type', '').strip()
     remote_filter = request.args.get('remote', '').strip()
+    multiple_periods_filter = request.args.get('multiple_periods', '').strip()
 
     query = Order.query
 
@@ -75,6 +76,15 @@ def order_list():
             )
         except (ValueError, IndexError):
             pass
+    if multiple_periods_filter == '1':
+        query = query.filter(Order.import_periods.contains(','))
+    elif multiple_periods_filter == '0':
+        query = query.filter(
+            db.or_(
+                Order.import_periods.is_(None),
+                db.not_(Order.import_periods.contains(','))
+            )
+        )
     if cargo_type_filter:
         query = query.filter(Order.cargo_type == cargo_type_filter)
     if remote_filter == '1':
@@ -128,6 +138,7 @@ def order_list():
         category_filter=category_filter,
         cargo_type_filter=cargo_type_filter,
         remote_filter=remote_filter,
+        multiple_periods_filter=multiple_periods_filter,
         fee_totals=fee_totals,
         current_customer=current_customer,
     )

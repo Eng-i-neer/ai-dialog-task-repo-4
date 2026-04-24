@@ -8,7 +8,7 @@
 }
 .filter-bar .form-control { font-size:0.85rem; height:36px; }
 .filter-bar input[type=text] { max-width:220px; }
-.filter-bar select { max-width:150px; }
+.filter-bar select { min-width:120px; max-width:200px; }
 .filter-bar input[type=date] { max-width:160px; }
 
 .order-list { display:flex; flex-direction:column; gap:0; }
@@ -103,6 +103,11 @@
       <option value="SC" {% if cargo_type_filter == 'SC' %}selected{% endif %}>特货</option>
       <option value="IC" {% if cargo_type_filter == 'IC' %}selected{% endif %}>敏感货</option>
     </select>
+    <select name="multiple_periods" class="form-control">
+      <option value="">全部订单</option>
+      <option value="1" {% if multiple_periods_filter == '1' %}selected{% endif %}>仅多版次订单</option>
+      <option value="0" {% if multiple_periods_filter == '0' %}selected{% endif %}>仅单版次订单</option>
+    </select>
     
     <button type="submit" class="btn btn-primary btn-sm">筛选</button>
     <a href="{{ url_for('orders.order_list') }}" class="btn btn-outline btn-sm">重置</a>
@@ -170,18 +175,18 @@
 {% if pagination.pages > 1 %}
 <div class="pagination">
   {% if pagination.has_prev %}
-  <a href="{{ url_for('orders.order_list', page=pagination.prev_num, q=search, customer_id=customer_id or '', region_id=region_id or '', bill_period=bill_period, category=category_filter, cargo_type=cargo_type_filter, remote=remote_filter) }}">上一页</a>
+  <a href="{{ url_for('orders.order_list', page=pagination.prev_num, q=search, customer_id=customer_id or '', region_id=region_id or '', bill_period=bill_period, category=category_filter, cargo_type=cargo_type_filter, remote=remote_filter, multiple_periods=multiple_periods_filter) }}">上一页</a>
   {% endif %}
   {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
     {% if p %}
-    <a href="{{ url_for('orders.order_list', page=p, q=search, customer_id=customer_id or '', region_id=region_id or '', bill_period=bill_period, category=category_filter, cargo_type=cargo_type_filter, remote=remote_filter) }}"
+    <a href="{{ url_for('orders.order_list', page=p, q=search, customer_id=customer_id or '', region_id=region_id or '', bill_period=bill_period, category=category_filter, cargo_type=cargo_type_filter, remote=remote_filter, multiple_periods=multiple_periods_filter) }}"
        class="{% if p == pagination.page %}active{% endif %}">{{ p }}</a>
     {% else %}
     <span style="padding:6px">…</span>
     {% endif %}
   {% endfor %}
   {% if pagination.has_next %}
-  <a href="{{ url_for('orders.order_list', page=pagination.next_num, q=search, customer_id=customer_id or '', region_id=region_id or '', bill_period=bill_period, category=category_filter, cargo_type=cargo_type_filter, remote=remote_filter) }}">下一页</a>
+  <a href="{{ url_for('orders.order_list', page=pagination.next_num, q=search, customer_id=customer_id or '', region_id=region_id or '', bill_period=bill_period, category=category_filter, cargo_type=cargo_type_filter, remote=remote_filter, multiple_periods=multiple_periods_filter) }}">下一页</a>
   {% endif %}
 </div>
 {% endif %}
