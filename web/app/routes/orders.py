@@ -66,7 +66,13 @@ def order_list():
         try:
             parts = bill_period.split('-')
             bp = date(int(parts[0]), int(parts[1]), int(parts[2]))
-            query = query.filter(Order.bill_period == bp)
+            period_str = f"{parts[0]}{parts[1]}{parts[2]}"
+            query = query.filter(
+                db.or_(
+                    Order.bill_period == bp,
+                    Order.import_periods.contains(period_str)
+                )
+            )
         except (ValueError, IndexError):
             pass
     if cargo_type_filter:
@@ -168,7 +174,13 @@ def api_order_list():
         try:
             parts = bill_period.split('-')
             bp = date(int(parts[0]), int(parts[1]), int(parts[2]))
-            query = query.filter(Order.bill_period == bp)
+            period_str = f"{parts[0]}{parts[1]}{parts[2]}"
+            query = query.filter(
+                db.or_(
+                    Order.bill_period == bp,
+                    Order.import_periods.contains(period_str)
+                )
+            )
         except (ValueError, IndexError):
             pass
 
@@ -303,8 +315,8 @@ def api_periods():
         if bp:
             periods.append({
                 'date': bp.strftime('%Y-%m-%d'),
-                'label': bp.strftime('%m%d'),
-                'full_label': bp.strftime('%m%d期'),
+                'label': bp.strftime('%Y%m%d'),
+                'full_label': bp.strftime('%Y%m%d期'),
                 'order_count': count
             })
     

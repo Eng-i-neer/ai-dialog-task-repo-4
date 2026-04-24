@@ -59,7 +59,7 @@
       </select>
       <div style="display:flex; gap:6px;">
         <input type="date" id="bill-period" class="form-control" style="flex:1;">
-        <span id="edition-preview" class="form-control" style="flex:none; width:80px; text-align:center; background:var(--primary-light); color:var(--primary); font-weight:700; display:none;">--期</span>
+        <span id="edition-preview" class="form-control" style="flex:none; width:100px; text-align:center; background:var(--primary-light); color:var(--primary); font-weight:700; display:none;">--期</span>
       </div>
     </div>
     <div class="form-group" style="margin:0; min-width:200px;" id="group-version-name">
@@ -189,7 +189,7 @@ function updateEditionPreview() {
   if (dateStr) {
     const parts = dateStr.split('-');
     if (parts.length === 3) {
-      const edition = parts[1] + parts[2];
+      const edition = parts[0] + parts[1] + parts[2];
       preview.textContent = edition + '期';
       preview.style.display = 'inline-flex';
       preview.style.alignItems = 'center';
