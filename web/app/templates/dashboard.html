@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}仪表盘 - 汇森对账管理{% endblock %}
+
+{% block extra_css %}
+<style>
+.customer-card {
+  border:1px solid var(--border); border-radius:var(--radius); margin-bottom:12px;
+  overflow:hidden; transition:box-shadow var(--transition);
+}
+.customer-card:hover { box-shadow:var(--shadow); }
+.customer-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 20px; background:var(--bg-card); cursor:pointer;
+  border-bottom:1px solid transparent; transition:all var(--transition);
+}
+.customer-header.expanded { border-bottom-color:var(--border); }
+.customer-header .name {
+  font-weight:700; font-size:0.95rem; display:flex; align-items:center; gap:8px;
+}
+.customer-header .name .arrow {
+  transition:transform 0.2s; font-size:0.7rem; color:var(--text-muted);
+}
+.customer-header.expanded .name .arrow { transform:rotate(90deg); }
+.customer-header .summary {
+  display:flex; gap:16px; font-size:0.8rem; color:var(--text-muted);
+}
+.customer-header .summary .s-val { font-weight:700; color:var(--text); }
+.customer-header .currency-badge {
+  padding:2px 8px; border-radius:999px; font-size:0.7rem; font-weight:600;
+}
+.currency-cny { background:#FFF3E0; color:#E65100; }
+.currency-eur { background:#E3F2FD; color:#1565C0; }
+
+.period-list { display:none; }
+.period-list.show { display:block; }
+.period-row {
+  display:grid; grid-template-columns:120px 1fr 80px 80px 80px 100px;
+  align-items:center; padding:12px 20px 12px 40px; border-bottom:1px solid var(--border);
+  font-size:0.83rem; transition:background var(--transition);
+}
+.period-row:last-child { border-bottom:none; }
+.period-row:hover { background:rgba(0,0,0,0.015); }
+.period-row .period-label {
+  font-weight:700; color:var(--primary); cursor:pointer;
+}
+.period-row .period-label:hover { text-decoration:underline; }
+.period-row .stat { text-align:center; }
+.period-row .stat-label { font-size:0.68rem; color:var(--text-muted); display:block; }
+.period-row .stat-val { font-weight:600; }
+.period-row .actions { text-align:right; }
+
+.period-header {
+  display:grid; grid-template-columns:120px 1fr 80px 80px 80px 100px;
+  padding:8px 20px 8px 40px; font-size:0.7rem; color:var(--text-muted);
+  font-weight:600; text-transform:uppercase; letter-spacing:0.5px;
+  background:var(--primary-light); border-bottom:1px solid var(--border);
+}
+.period-header div:nth-child(n+3) { text-align:center; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h2>仪表盘</h2>
+  <div class="d-flex gap-1">
+    <a href="{{ url_for('imports.import_page') }}" class="btn btn-primary">导入账单</a>
+    <a href="{{ url_for('exports.export_page') }}" class="btn btn-outline">导出报表</a>
+  </div>
+</div>
+
+<div class="stats-grid">
+  <div class="card stat-card">
+    <div class="stat-icon">📦</div>
+    <div class="stat-label">本期订单</div>
+    <div class="stat-value">{{ total_orders }}</div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-icon">⏳</div>
+    <div class="stat-label">待处理</div>
+    <div class="stat-value">{{ pending }}</div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-icon">✅</div>
+    <div class="stat-label">已导出</div>
+    <div class="stat-value">{{ exported }}</div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-icon">👥</div>
+    <div class="stat-label">客户数</div>
+    <div class="stat-value">{{ total_customers }}</div>
+  </div>
+</div>
+
+<div class="card mb-2" style="padding:18px 20px;">
+  <h3 style="font-size:0.95rem; font-weight:700; margin-bottom:16px;">客户 × 账期总览</h3>
+
+  {% if customer_periods %}
+  {% for cust in customer_periods %}
+  <div class="customer-card">
+    <div class="customer-header" onclick="togglePeriods(this)">
+      <div class="name">
+        <span class="arrow">▶</span>
+        {{ cust.name }}
+        <span class="currency-badge {% if cust.currency == 'CNY' %}currency-cny{% else %}currency-eur{% endif %}">
+          {{ cust.currency }}
+        </span>
+      </div>
+      <div class="summary">
+        <span>订单 <span class="s-val">{{ cust.total_orders }}</span></span>
+        <span>账期 <span class="s-val">{{ cust.periods|length }}</span></span>
+      </div>
+    </div>
+    <div class="period-list">
+      <div class="period-header">
+        <div>账期</div>
+        <div></div>
+        <div>订单数</div>
+        <div>待处理</div>
+        <div>已导出</div>
+        <div></div>
+      </div>
+      {% for p in cust.periods %}
+      <div class="period-row">
+        <div class="period-label">
+          <a href="{{ url_for('orders.order_list', customer_id=cust.id, bill_period=p.date) }}">
+            {{ p.label }}期
+          </a>
+        </div>
+        <div></div>
+        <div class="stat"><span class="stat-val">{{ p.count }}</span></div>
+        <div class="stat"><span class="stat-val" style="{% if p.pending > 0 %}color:var(--warning){% endif %}">{{ p.pending }}</span></div>
+        <div class="stat"><span class="stat-val" style="{% if p.exported > 0 %}color:var(--success){% endif %}">{{ p.exported }}</span></div>
+        <div class="actions">
+          <a href="{{ url_for('orders.order_list', customer_id=cust.id, bill_period=p.date) }}" class="btn btn-outline btn-sm">查看订单</a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="text-center text-muted" style="padding:40px; font-size:0.85rem">暂无订单数据，请先导入账单</div>
+  {% endif %}
+</div>
+
+<div class="card mt-3">
+  <div style="padding:18px 20px; border-bottom:1px solid var(--border);">
+    <h3 style="font-size:0.95rem; font-weight:600;">最近导入记录</h3>
+  </div>
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>文件名</th>
+          <th>类型</th>
+          <th>账期</th>
+          <th>处理数</th>
+          <th>状态</th>
+          <th>时间</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in recent_imports %}
+        <tr>
+          <td>{{ log.filename }}</td>
+          <td>
+            {% if log.file_type == 'agent_bill' %}代理账单
+            {% elif log.file_type == 'cargo_status' %}货况表
+            {% elif log.file_type == 'pricing_file' %}报价文件
+            {% else %}{{ log.file_type }}{% endif %}
+          </td>
+          <td>{{ log.bill_period.strftime('%Y-%m-%d') if log.bill_period else '-' }}</td>
+          <td>{{ log.orders_count or '-' }}</td>
+          <td>
+            <span class="badge {% if log.status == 'success' %}badge-success{% elif log.status == 'error' %}badge-danger{% else %}badge-warning{% endif %}">
+              {{ log.status }}
+            </span>
+          </td>
+          <td>{{ log.created_at.strftime('%m-%d %H:%M') if log.created_at else '-' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted" style="padding:30px">暂无导入记录</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function togglePeriods(header) {
+  const card = header.closest('.customer-card');
+  const list = card.querySelector('.period-list');
+  const isExpanded = list.classList.contains('show');
+  list.classList.toggle('show');
+  header.classList.toggle('expanded');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}导出管理 - 汇森对账管理{% endblock %}
+
+{% block extra_css %}
+<style>
+.export-info {
+  padding:16px; background:var(--primary-light); border-radius:var(--radius-sm);
+  margin-bottom:16px; font-size:0.83rem; line-height:1.6;
+}
+.export-info strong { color:var(--primary); }
+.sheet-preview {
+  display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;
+}
+.sheet-tag {
+  padding:4px 10px; background:var(--bg-card); border:1px solid var(--border);
+  border-radius:var(--radius-sm); font-size:0.78rem; font-weight:600;
+}
+.fee-list {
+  display:flex; flex-wrap:wrap; gap:12px; margin-top:8px;
+}
+.fee-item {
+  display:flex; align-items:center; gap:5px; font-size:0.84rem; cursor:pointer;
+}
+.fee-item input { margin:0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h2>导出管理</h2>
+</div>
+
+<div class="card" style="padding:24px;">
+  <h3 style="font-size:0.95rem; font-weight:700; margin-bottom:16px;">生成客户对账单</h3>
+
+  <div class="d-flex gap-2 flex-wrap">
+    <div class="form-group" style="margin:0; min-width:180px;">
+      <label>客户 *</label>
+      <select id="exp-customer" class="form-control" onchange="onCustomerChange()">
+        <option value="">选择客户</option>
+        {% for c in customers %}
+        <option value="{{ c.id }}" data-currency="{{ c.currency }}">{{ c.name }} ({{ c.currency }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group" style="margin:0; min-width:180px;">
+      <label>账期 *</label>
+      <input type="date" id="exp-period" class="form-control" onchange="previewExport()">
+    </div>
+  </div>
+
+  <div id="sheet-info" style="display:none" class="export-info">
+    <div id="sheet-info-rmb" style="display:none">
+      <strong>RMB结算客户（如李志）</strong> — 导出Sheet结构：
+      <div class="sheet-preview">
+        <span class="sheet-tag">COD回款（代收金额+COD手续费）</span>
+        <span class="sheet-tag">运费表（头程运费+尾程运费+代收手续费+附加费）</span>
+        <span class="sheet-tag">尾程杂费（上架费+退件入仓费+增值税+偏远费）</span>
+      </div>
+    </div>
+    <div id="sheet-info-eur" style="display:none">
+      <strong>EUR结算客户</strong> — 导出Sheet结构：
+      <div class="sheet-preview">
+        <span class="sheet-tag">汇总</span>
+        <span class="sheet-tag">COD回款</span>
+        <span class="sheet-tag">头程&尾程运费（含COD手续费）</span>
+        <span class="sheet-tag">增值税&清关费</span>
+        <span class="sheet-tag">尾程杂费（上架费+退件费+偏远费）</span>
+        <span class="sheet-tag">附加费</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label>导出费用项</label>
+    <div class="fee-list" id="fee-checks">
+      <label class="fee-item"><input type="checkbox" value="HEAD_FREIGHT" checked> 头程运费</label>
+      <label class="fee-item"><input type="checkbox" value="TAIL_FREIGHT" checked> 尾程运费</label>
+      <label class="fee-item"><input type="checkbox" value="COD_FEE" checked> COD手续费</label>
+      <label class="fee-item"><input type="checkbox" value="RETURN_FEE" checked> 退件费</label>
+      <label class="fee-item"><input type="checkbox" value="SHELF_FEE" checked> 上架费</label>
+      <label class="fee-item"><input type="checkbox" value="F_SURCHARGE" checked> 附加费</label>
+      <label class="fee-item"><input type="checkbox" value="VAT" checked> 增值税</label>
+      <label class="fee-item"><input type="checkbox" value="REMOTE_FEE" checked> 偏远费</label>
+    </div>
+  </div>
+
+  <div id="preview-box" class="mt-2" style="display:none">
+    <div style="padding:16px; background:var(--primary-light); border-radius:var(--radius-sm);">
+      <span>将导出 <strong id="preview-count">0</strong> 条订单</span>
+    </div>
+  </div>
+
+  <div class="mt-2">
+    <button class="btn btn-primary btn-lg" onclick="generateExport()">生成 Excel</button>
+  </div>
+</div>
+
+<div class="card mt-3" id="download-section" style="display:none">
+  <div style="padding:20px; text-align:center;">
+    <div style="font-size:2rem; margin-bottom:8px;">✅</div>
+    <p style="font-weight:600; margin-bottom:12px;">导出完成</p>
+    <a id="download-link" href="#" class="btn btn-success" download>下载 Excel 文件</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function onCustomerChange() {
+  const sel = document.getElementById('exp-customer');
+  const opt = sel.options[sel.selectedIndex];
+  const currency = opt?.dataset?.currency || '';
+
+  const infoBox = document.getElementById('sheet-info');
+  const rmbInfo = document.getElementById('sheet-info-rmb');
+  const eurInfo = document.getElementById('sheet-info-eur');
+
+  if (sel.value) {
+    infoBox.style.display = '';
+    if (currency === 'CNY') {
+      rmbInfo.style.display = '';
+      eurInfo.style.display = 'none';
+    } else {
+      rmbInfo.style.display = 'none';
+      eurInfo.style.display = '';
+    }
+  } else {
+    infoBox.style.display = 'none';
+  }
+
+  previewExport();
+}
+
+function getSelectedFees() {
+  return [...document.querySelectorAll('#fee-checks input[type="checkbox"]:checked')].map(cb => cb.value);
+}
+
+async function previewExport() {
+  const customerId = document.getElementById('exp-customer').value;
+  const period = document.getElementById('exp-period').value;
+  if (!customerId || !period) return;
+
+  try {
+    const data = await apiFetch('/exports/api/preview', {
+      method: 'POST',
+      body: { customer_id: parseInt(customerId), bill_period: period, fee_codes: getSelectedFees() }
+    });
+    document.getElementById('preview-count').textContent = data.orders_count;
+    document.getElementById('preview-box').style.display = '';
+  } catch(e) {}
+}
+
+async function generateExport() {
+  const customerId = document.getElementById('exp-customer').value;
+  const period = document.getElementById('exp-period').value;
+
+  if (!customerId) { showToast('请选择客户', 'warning'); return; }
+  if (!period) { showToast('请选择账期', 'warning'); return; }
+
+  try {
+    const data = await apiFetch('/exports/api/generate', {
+      method: 'POST',
+      body: {
+        customer_id: parseInt(customerId),
+        bill_period: period,
+        fee_codes: getSelectedFees()
+      }
+    });
+    showToast('导出成功', 'success');
+    document.getElementById('download-link').href = data.download_url;
+    document.getElementById('download-link').textContent = `下载 ${data.filename}`;
+    document.getElementById('download-section').style.display = '';
+  } catch(e) {}
+}
+</script>
+{% endblock %}

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}汇森对账管理系统{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/themes.css') }}" />
+  <script>
+    const BASE_URL = "{{ request.script_root }}";
+    (function() {
+      var t = localStorage.getItem('hs-theme') || 'classic-blue';
+      if (!['classic-blue','ocean-teal','apple-clean'].includes(t)) t = 'classic-blue';
+      document.documentElement.setAttribute('data-theme-hint', t);
+    })();
+  </script>
+  {% block extra_css %}{% endblock %}
+</head>
+<body data-theme="classic-blue">
+
+{% set nav_items = [
+  ('main.dashboard', '仪表盘', '📊'),
+  ('imports.import_page', '导入管理', '📂'),
+  ('orders.order_list', '订单管理', '📦'),
+  ('customers.customer_list', '客户管理', '👥'),
+  ('regions.region_list', '地区管理', '🌍'),
+  ('pricing.pricing_page', '计价规则', '💰'),
+  ('exchange_rates.rates_page', '汇率管理', '💱'),
+  ('exports.export_page', '导出管理', '📤'),
+] %}
+
+{% set current_bp = request.blueprints[0] if request.blueprints else '' %}
+
+<!-- ========== SIDEBAR (classic-blue & apple-clean) ========== -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <h1>汇森对账管理</h1>
+    <p>Billing Management</p>
+  </div>
+  <nav class="sidebar-nav">
+    {% for endpoint, label, icon in nav_items %}
+    {% set item_bp = endpoint.split('.')[0] %}
+    <a href="{{ url_for(endpoint) }}"
+       class="{% if current_bp == item_bp %}active{% endif %}">
+      <span class="nav-icon">{{ icon }}</span>
+      {{ label }}
+    </a>
+    {% endfor %}
+  </nav>
+  <div class="sidebar-footer">
+    <div class="d-flex align-center justify-between">
+      <span class="text-muted" style="font-size:0.75rem">切换主题</span>
+      <div class="theme-switcher">
+        <button class="t-blue" data-theme="classic-blue" onclick="setTheme('classic-blue')" title="经典蓝"></button>
+        <button class="t-teal" data-theme="ocean-teal" onclick="setTheme('ocean-teal')" title="海洋"></button>
+        <button class="t-apple" data-theme="apple-clean" onclick="setTheme('apple-clean')" title="简洁"></button>
+      </div>
+    </div>
+  </div>
+</aside>
+<div class="sidebar-backdrop" id="sidebar-backdrop" onclick="closeSidebar()"></div>
+
+<!-- ========== TOP-NAV (ocean-teal) ========== -->
+<header class="topbar" id="topbar">
+  <div class="topbar-inner">
+    <div class="topbar-brand">
+      汇森对账管理 <span>Billing</span>
+    </div>
+    <button class="topbar-menu-btn" onclick="toggleTopNav()" aria-label="菜单">&#9776;</button>
+    <nav class="topbar-nav" id="topbar-nav">
+      {% for endpoint, label, icon in nav_items %}
+      {% set item_bp = endpoint.split('.')[0] %}
+      <a href="{{ url_for(endpoint) }}"
+         class="{% if current_bp == item_bp %}active{% endif %}">
+        {{ label }}
+      </a>
+      {% endfor %}
+    </nav>
+    <div class="theme-switcher">
+      <button class="t-blue" data-theme="classic-blue" onclick="setTheme('classic-blue')" title="经典蓝"></button>
+      <button class="t-teal" data-theme="ocean-teal" onclick="setTheme('ocean-teal')" title="海洋"></button>
+      <button class="t-apple" data-theme="apple-clean" onclick="setTheme('apple-clean')" title="简洁"></button>
+    </div>
+  </div>
+</header>
+
+<!-- ========== MAIN CONTENT (shared, single instance) ========== -->
+<main class="main-content" id="main-content">
+  <div class="mobile-toolbar">
+    <button class="mobile-menu-btn" onclick="toggleSidebar()" aria-label="菜单">&#9776;</button>
+  </div>
+  {% block content %}{% endblock %}
+</main>
+
+<div class="toast-container"></div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

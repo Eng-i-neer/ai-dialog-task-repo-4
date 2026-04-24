@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>汇森对账管理系统</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --text: #111111;
+      --muted: #666666;
+      --border: #e5e5e5;
+      --bg: #ffffff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Noto Sans SC", -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.65;
+      font-weight: 400;
+      letter-spacing: 0.01em;
+    }
+    .app {
+      display: flex;
+      min-height: 100vh;
+    }
+    .sidebar {
+      width: 260px;
+      flex-shrink: 0;
+      padding: 3rem 0 2rem 2.5rem;
+      border-right: 1px solid var(--border);
+    }
+    .brand {
+      margin-bottom: 3.5rem;
+      padding-right: 1.5rem;
+    }
+    .brand h1 {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: 0.04em;
+      line-height: 1.4;
+    }
+    .brand span {
+      display: block;
+      margin-top: 0.75rem;
+      font-size: 0.8125rem;
+      font-weight: 300;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    nav {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    nav a {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.85rem 0 0.85rem 0;
+      margin-right: -1px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.9375rem;
+      font-weight: 400;
+      border-left: 2px solid transparent;
+      padding-left: 1rem;
+      margin-left: -1rem;
+      transition: color 0.12s ease;
+    }
+    nav a:hover { color: var(--text); }
+    nav a.active {
+      color: var(--text);
+      font-weight: 500;
+      border-left-color: var(--text);
+    }
+    nav a .ico {
+      font-size: 0.875rem;
+      width: 1.25rem;
+      opacity: 0.85;
+    }
+    .main {
+      flex: 1;
+      padding: 3.5rem 4rem 4rem;
+      max-width: 1200px;
+    }
+    .page-title {
+      font-size: 2rem;
+      font-weight: 300;
+      color: var(--text);
+      margin-bottom: 0.75rem;
+      letter-spacing: 0.06em;
+    }
+    .page-desc {
+      font-size: 0.9375rem;
+      color: var(--muted);
+      font-weight: 300;
+      margin-bottom: 3.5rem;
+      max-width: 42rem;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 2.5rem 3rem;
+      margin-bottom: 4rem;
+      padding-bottom: 3rem;
+      border-bottom: 1px solid var(--border);
+    }
+    @media (max-width: 1024px) {
+      .stats { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 720px) {
+      .app { flex-direction: column; }
+      .sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        padding: 2rem 2rem 1.5rem;
+      }
+      nav { flex-direction: row; flex-wrap: wrap; gap: 0.5rem 1rem; }
+      .main { padding: 2.5rem 1.75rem; }
+    }
+    .stat-block .label {
+      font-size: 0.8125rem;
+      color: var(--muted);
+      font-weight: 400;
+      margin-bottom: 1rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .stat-block .value {
+      font-size: 2.25rem;
+      font-weight: 300;
+      color: var(--text);
+      letter-spacing: 0.02em;
+      font-variant-numeric: tabular-nums;
+    }
+    .section-label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      margin-bottom: 1.5rem;
+      font-weight: 400;
+    }
+    .table-wrap {
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9375rem;
+    }
+    th {
+      text-align: left;
+      padding: 1.15rem 1.5rem;
+      font-weight: 500;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      font-size: 0.8125rem;
+      letter-spacing: 0.04em;
+    }
+    td {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      font-weight: 400;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafafa; }
+    .status {
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+    .status.done { color: var(--text); }
+    .amount {
+      font-variant-numeric: tabular-nums;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <h1>汇森对账管理系统</h1>
+        <span>物流计费与对账</span>
+      </div>
+      <nav>
+        <a class="active" href="#"><span class="ico">◉</span>仪表盘</a>
+        <a href="#"><span class="ico">▣</span>导入管理</a>
+        <a href="#"><span class="ico">◈</span>订单管理</a>
+        <a href="#"><span class="ico">◇</span>客户管理</a>
+        <a href="#"><span class="ico">◎</span>地区管理</a>
+        <a href="#"><span class="ico">▤</span>计价规则</a>
+        <a href="#"><span class="ico">¤</span>汇率管理</a>
+        <a href="#"><span class="ico">⬡</span>导出管理</a>
+      </nav>
+    </aside>
+    <main class="main">
+      <h1 class="page-title">仪表盘</h1>
+      <p class="page-desc">本期业务概览。数据更新时间：2026-04-09 09:30</p>
+
+      <section class="stats" aria-label="统计概览">
+        <div class="stat-block">
+          <div class="label">本期订单</div>
+          <div class="value">1,247</div>
+        </div>
+        <div class="stat-block">
+          <div class="label">待处理</div>
+          <div class="value">89</div>
+        </div>
+        <div class="stat-block">
+          <div class="label">已导出</div>
+          <div class="value">1,158</div>
+        </div>
+        <div class="stat-block">
+          <div class="label">客户数</div>
+          <div class="value">11</div>
+        </div>
+      </section>
+
+      <p class="section-label">近期订单</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>运单号</th>
+              <th>目的地</th>
+              <th>客户</th>
+              <th>重量</th>
+              <th>状态</th>
+              <th>金额</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>HS202604081234</td>
+              <td>德国 · 汉堡</td>
+              <td>上海恒通国际贸易有限公司</td>
+              <td>12.5 kg</td>
+              <td><span class="status done">已对账</span></td>
+              <td class="amount">¥2,340.00</td>
+            </tr>
+            <tr>
+              <td>HS202604082156</td>
+              <td>荷兰 · 鹿特丹</td>
+              <td>深圳远景物流科技</td>
+              <td>28.0 kg</td>
+              <td><span class="status">待处理</span></td>
+              <td class="amount">¥4,120.50</td>
+            </tr>
+            <tr>
+              <td>HS202604083021</td>
+              <td>比利时 · 安特卫普</td>
+              <td>杭州汇森供应链</td>
+              <td>8.2 kg</td>
+              <td><span class="status">已导出</span></td>
+              <td class="amount">¥1,895.00</td>
+            </tr>
+            <tr>
+              <td>HS202604083445</td>
+              <td>法国 · 里昂</td>
+              <td>苏州德迅货运代理</td>
+              <td>45.6 kg</td>
+              <td><span class="status done">已对账</span></td>
+              <td class="amount">¥6,780.20</td>
+            </tr>
+            <tr>
+              <td>HS202604084102</td>
+              <td>波兰 · 华沙</td>
+              <td>宁波海联跨境商贸</td>
+              <td>19.3 kg</td>
+              <td><span class="status">待处理</span></td>
+              <td class="amount">¥3,256.80</td>
+            </tr>
+            <tr>
+              <td>HS202604084889</td>
+              <td>意大利 · 米兰</td>
+              <td>广州星航国际物流</td>
+              <td>33.1 kg</td>
+              <td><span class="status">已导出</span></td>
+              <td class="amount">¥5,442.00</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

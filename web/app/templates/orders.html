@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+{% block title %}订单管理 - 汇森对账管理{% endblock %}
+
+{% block extra_css %}
+<style>
+.filter-bar {
+  display:flex; gap:10px; flex-wrap:wrap; align-items:center; padding:16px 20px;
+}
+.filter-bar .form-control { font-size:0.85rem; height:36px; }
+.filter-bar input[type=text] { max-width:220px; }
+.filter-bar select { max-width:150px; }
+.filter-bar input[type=date] { max-width:160px; }
+
+.order-list { display:flex; flex-direction:column; gap:0; }
+.order-row {
+  display:grid;
+  grid-template-columns: 36px minmax(130px,1.4fr) 70px 70px minmax(140px,2fr) 90px 90px 80px 60px;
+  align-items:center; padding:10px 16px; border-bottom:1px solid var(--border);
+  font-size:0.82rem; transition:background var(--transition);
+}
+.order-row:hover { background:rgba(0,0,0,0.015); }
+.order-row.header {
+  font-weight:600; color:var(--text-muted); font-size:0.7rem;
+  text-transform:uppercase; letter-spacing:0.5px; background:var(--primary-light);
+  border-bottom:2px solid var(--border); border-radius:var(--radius) var(--radius) 0 0;
+}
+.order-row .waybill { font-weight:600; color:var(--primary); cursor:pointer; font-size:0.78rem; }
+.order-row .waybill:hover { text-decoration:underline; }
+
+.cat-badges { display:flex; flex-wrap:wrap; gap:3px; }
+.cat-badge {
+  display:inline-block; padding:1px 6px; border-radius:999px; font-size:0.65rem; font-weight:600;
+  background:var(--primary-light); color:var(--primary); white-space:nowrap;
+}
+.cat-badge.cod { background:#E8F5E9; color:#2E7D32; }
+.cat-badge.return { background:#FFF3E0; color:#E65100; }
+.cat-badge.shelf { background:#F3E5F5; color:#6A1B9A; }
+.cat-badge.remote { background:#FFEBEE; color:#C62828; }
+.cat-badge.second-delivery { background:#E3F2FD; color:#1565C0; }
+
+.order-row .cod-amount { font-weight:600; color:#2E7D32; }
+.order-row .fee-total { font-weight:600; color:var(--primary); }
+
+.status-badge {
+  display:inline-block; padding:3px 10px; border-radius:999px; font-size:0.7rem; font-weight:600;
+}
+.status-pending { background:var(--warning-bg, #FFF3E0); color:var(--warning, #E65100); }
+.status-done { background:var(--success-bg); color:var(--success); }
+.status-imported { background:var(--primary-light); color:var(--primary); }
+
+.action-bar {
+  display:flex; gap:8px; align-items:center; padding:12px 20px; border-bottom:1px solid var(--border);
+  flex-wrap:wrap;
+}
+.action-bar .batch-group {
+  display:flex; gap:6px; align-items:center; margin-left:auto;
+}
+
+.page-subtitle {
+  font-size:0.82rem; color:var(--text-muted); margin-top:2px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2>订单管理{% if current_customer %} — {{ current_customer.name }}{% endif %}</h2>
+    {% if bill_period %}
+    <div class="page-subtitle">账期: {{ bill_period }}</div>
+    {% endif %}
+  </div>
+  <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline btn-sm">← 返回仪表盘</a>
+</div>
+
+<div class="card mb-2">
+  <form method="GET" action="{{ url_for('orders.order_list') }}" class="filter-bar">
+    <input type="text" name="q" class="form-control" placeholder="搜索运单号…" value="{{ search }}">
+    <select name="customer_id" class="form-control">
+      <option value="">全部客户</option>
+      {% for c in customers %}
+      <option value="{{ c.id }}" {% if customer_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+      {% endfor %}
+    </select>
+    <select name="region_id" class="form-control">
+      <option value="">全部地区</option>
+      {% for r in regions %}
+      <option value="{{ r.id }}" {% if region_id == r.id %}selected{% endif %}>{{ r.name }}</option>
+      {% endfor %}
+    </select>
+    <input type="date" name="bill_period" class="form-control" value="{{ bill_period }}">
+    <select name="category" class="form-control">
+      <option value="">筛选费用标记</option>
+      {% for code, label in fee_filter_options %}
+      <option value="{{ code }}" {% if category_filter == code %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <select name="cargo_type" class="form-control">
+      <option value="">全部货类</option>
+      <option value="GS" {% if cargo_type_filter == 'GS' %}selected{% endif %}>普货</option>
+      <option value="SC" {% if cargo_type_filter == 'SC' %}selected{% endif %}>特货</option>
+      <option value="IC" {% if cargo_type_filter == 'IC' %}selected{% endif %}>敏感货</option>
+    </select>
+    
+    <button type="submit" class="btn btn-primary btn-sm">筛选</button>
+    <a href="{{ url_for('orders.order_list') }}" class="btn btn-outline btn-sm">重置</a>
+  </form>
+</div>
+
+<div class="card">
+  <div class="action-bar">
+    <label style="display:flex; align-items:center; gap:6px; font-size:0.82rem; cursor:pointer">
+      <input type="checkbox" id="selectAll"> 全选
+    </label>
+    <span style="font-size:0.82rem; color:var(--text-muted)">共 <strong>{{ pagination.total }}</strong> 条</span>
+    <div class="batch-group">
+      <button class="btn btn-outline btn-sm" onclick="batchRecalculate()">批量计算</button>
+      <button class="btn btn-outline btn-sm" onclick="showBatchOverride()">批量覆盖</button>
+      <button class="btn btn-danger btn-sm" onclick="batchDelete()">批量删除</button>
+    </div>
+  </div>
+
+  <div class="order-list">
+    <div class="order-row header">
+      <div></div>
+      <div>运单号</div>
+      <div>目的地</div>
+      <div>重量</div>
+      <div>适用费用</div>
+      <div>COD代收</div>
+      <div>应收合计</div>
+      <div>状态</div>
+      <div></div>
+    </div>
+    {% for order in orders %}
+    <div class="order-row">
+      <div><input type="checkbox" name="order_ids" value="{{ order.id }}"></div>
+      <div class="waybill" onclick="location.href='{{ url_for('orders.order_detail', order_id=order.id) }}'">{{ order.waybill_no }}</div>
+      <div>{{ order.region.name if order.region else '-' }}</div>
+      <div>{{ '%.2f'|format(order.actual_weight) if order.actual_weight else '-' }}</div>
+      <div>
+        <div class="cat-badges">
+          {% if order.cod_amount %}<span class="cat-badge cod">COD代收</span>{% endif %}
+          {% if order.needs_return_fee %}<span class="cat-badge return">退件</span>{% endif %}
+          {% if order.needs_shelf_fee %}<span class="cat-badge shelf">上架</span>{% endif %}
+          {% if order.needs_vat %}<span class="cat-badge">增值税</span>{% endif %}
+          {% if order.needs_second_delivery %}<span class="cat-badge second-delivery">二派费</span>{% endif %}
+          {% if order.is_remote %}<span class="cat-badge remote">偏远</span>{% endif %}
+          {% if not order.cod_amount and not order.needs_return_fee and not order.needs_shelf_fee and not order.needs_vat and not order.needs_second_delivery and not order.is_remote %}
+            <span style="color:var(--text-muted); font-size:0.75rem">运费</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="cod-amount">{{ '%.2f'|format(order.cod_amount) if order.cod_amount else '-' }}</div>
+      <div class="fee-total">{% set ft = fee_totals.get(order.id, 0) %}{{ '%.2f'|format(ft) if ft else '-' }}</div>
+      <div>
+        {% set st = order.logistics_status or '已导入' %}
+        <span class="status-badge {% if st == '已导出' %}status-done{% elif st == '待处理' %}status-pending{% else %}status-imported{% endif %}">{{ st }}</span>
+      </div>
+      <div><a href="{{ url_for('orders.order_detail', order_id=order.id) }}" style="font-size:0.75rem; color:var(--primary)">详情</a></div>
+    </div>
+    {% else %}
+    <div class="text-center text-muted" style="padding:60px; font-size:0.85rem">暂无订单数据</div>
+    {% endfor %}
+  </div>
+</div>
+
+{% if pagination.pages > 1 %}
+<div class="pagination">
+  {% if pagination.has_prev %}
+  <a href="{{ url_for('orders.order_list', page=pagination.prev_num, q=search, customer_id=customer_id or '', region_id=region_id or '', bill_period=bill_period, category=category_filter, cargo_type=cargo_type_filter, remote=remote_filter) }}">上一页</a>
+  {% endif %}
+  {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+    {% if p %}
+    <a href="{{ url_for('orders.order_list', page=p, q=search, customer_id=customer_id or '', region_id=region_id or '', bill_period=bill_period, category=category_filter, cargo_type=cargo_type_filter, remote=remote_filter) }}"
+       class="{% if p == pagination.page %}active{% endif %}">{{ p }}</a>
+    {% else %}
+    <span style="padding:6px">…</span>
+    {% endif %}
+  {% endfor %}
+  {% if pagination.has_next %}
+  <a href="{{ url_for('orders.order_list', page=pagination.next_num, q=search, customer_id=customer_id or '', region_id=region_id or '', bill_period=bill_period, category=category_filter, cargo_type=cargo_type_filter, remote=remote_filter) }}">下一页</a>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- Batch Override Modal -->
+<div id="batchOverrideModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:1000; display:none; align-items:center; justify-content:center;">
+  <div style="background:var(--bg-card); border-radius:var(--radius); padding:24px; min-width:360px; box-shadow:var(--shadow-lg);">
+    <h3 style="font-size:0.95rem; font-weight:700; margin-bottom:16px;">批量覆盖金额</h3>
+    <div class="form-group">
+      <label>科目</label>
+      <select id="bo-category" class="form-control">
+        {% for code, label in fee_labels.items() %}
+        <option value="{{ code }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>金额（留空则清除覆盖）</label>
+      <input type="number" step="0.01" id="bo-amount" class="form-control" placeholder="输入金额">
+    </div>
+    <div class="d-flex gap-1" style="margin-top:16px">
+      <button class="btn btn-primary" onclick="doBatchOverride()">确认</button>
+      <button class="btn btn-outline" onclick="closeBatchOverride()">取消</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('selectAll')?.addEventListener('change', function() {
+  document.querySelectorAll('input[name="order_ids"]').forEach(cb => cb.checked = this.checked);
+});
+
+function getSelectedIds() {
+  return [...document.querySelectorAll('input[name="order_ids"]:checked')].map(cb => parseInt(cb.value));
+}
+
+async function batchRecalculate() {
+  const ids = getSelectedIds();
+  if (!ids.length) { showToast('请先勾选订单', 'warning'); return; }
+  try {
+    await apiFetch('/orders/api/batch-calculate', { method:'POST', body:{ order_ids: ids } });
+    showToast(`已完成 ${ids.length} 条订单的费用计算`, 'success');
+    setTimeout(() => location.reload(), 800);
+  } catch(e) {}
+}
+
+function showBatchOverride() {
+  const ids = getSelectedIds();
+  if (!ids.length) { showToast('请先勾选订单', 'warning'); return; }
+  const modal = document.getElementById('batchOverrideModal');
+  modal.style.display = 'flex';
+}
+
+function closeBatchOverride() {
+  document.getElementById('batchOverrideModal').style.display = 'none';
+}
+
+async function doBatchOverride() {
+  const ids = getSelectedIds();
+  const code = document.getElementById('bo-category').value;
+  const amtStr = document.getElementById('bo-amount').value.trim();
+  const amount = amtStr ? parseFloat(amtStr) : null;
+
+  try {
+    const res = await apiFetch('/orders/api/batch-override', {
+      method:'POST', body:{ order_ids: ids, category_code: code, amount }
+    });
+    showToast(`已更新 ${res.updated} 条`, 'success');
+    closeBatchOverride();
+    setTimeout(() => location.reload(), 800);
+  } catch(e) {}
+}
+
+async function batchDelete() {
+  const ids = getSelectedIds();
+  if (!ids.length) { showToast('请先勾选订单', 'warning'); return; }
+  if (!confirm(`确定删除 ${ids.length} 条订单？此操作不可恢复。`)) return;
+  try {
+    const res = await apiFetch('/orders/api/batch-delete', { method:'POST', body:{ order_ids: ids } });
+    showToast(`已删除 ${res.deleted} 条`, 'success');
+    setTimeout(() => location.reload(), 800);
+  } catch(e) {}
+}
+</script>
+{% endblock %}

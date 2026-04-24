@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+{% block title %}偏远邮编管理 - 汇森对账管理{% endblock %}
+
+{% block extra_css %}
+<style>
+.toolbar { display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }
+.toolbar .form-control { font-size:0.85rem; }
+.toolbar select { max-width:200px; }
+.toolbar input[type=text] { max-width:280px; }
+.stats { font-size:0.8rem; color:var(--text-muted); margin-left:auto; }
+
+.country-tags { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
+.country-tag {
+  padding:5px 14px; border:1px solid var(--border); border-radius:999px;
+  font-size:0.78rem; cursor:pointer; transition:all var(--transition); background:var(--bg-card);
+}
+.country-tag:hover { border-color:var(--primary); background:var(--primary-light); }
+.country-tag.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+.country-tag .cnt { font-weight:700; margin-left:4px; opacity:0.7; }
+
+.pc-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:12px; }
+.pc-card {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);
+  padding:14px 16px; transition:box-shadow var(--transition); position:relative;
+}
+.pc-card:hover { box-shadow:var(--shadow-lg); }
+.pc-card .pc-postcode { font-size:1.1rem; font-weight:700; color:var(--primary); letter-spacing:1px; }
+.pc-card .pc-meta { display:flex; gap:16px; margin-top:8px; font-size:0.8rem; color:var(--text-muted); }
+.pc-card .pc-meta .label { font-weight:600; color:var(--text); margin-right:4px; }
+.pc-card .pc-zone { display:inline-block; margin-top:6px; padding:2px 10px; border-radius:999px; font-size:0.72rem; font-weight:600; background:var(--primary-light); color:var(--primary); }
+.pc-card .pc-fee { margin-top:10px; font-size:0.85rem; font-weight:600; }
+.pc-card .pc-fee .amt { font-size:1rem; color:var(--text); }
+.pc-card .pc-fee .unit { font-size:0.72rem; color:var(--text-muted); font-weight:500; }
+.pc-card .pc-actions { position:absolute; top:10px; right:12px; display:flex; gap:4px; opacity:0; transition:opacity var(--transition); }
+.pc-card:hover .pc-actions { opacity:1; }
+
+.pc-card .editable-val { cursor:pointer; border-bottom:1px dashed var(--primary); padding-bottom:1px; }
+.pc-card .editable-val:hover { background:var(--primary-light); border-radius:2px; }
+.pc-card input.inline-input {
+  border:1px solid var(--primary); border-radius:3px; padding:2px 6px;
+  font-size:inherit; font-weight:inherit; outline:none; width:auto; max-width:80px;
+}
+
+.pagination { display:flex; gap:6px; align-items:center; justify-content:center; margin-top:20px; }
+.pagination button { padding:6px 14px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg-card); cursor:pointer; font-size:0.8rem; transition:all var(--transition); }
+.pagination button:hover { border-color:var(--primary); background:var(--primary-light); }
+.pagination button.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+.pagination button:disabled { opacity:0.4; cursor:default; }
+
+.summary-strip {
+  display:flex; gap:20px; padding:12px 0; margin-bottom:8px; border-bottom:1px solid var(--border);
+  font-size:0.82rem; color:var(--text-muted);
+}
+.summary-strip .s-item { display:flex; align-items:center; gap:6px; }
+.summary-strip .s-val { font-weight:700; color:var(--text); font-size:0.9rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2>偏远邮编管理</h2>
+    <p class="text-muted" style="font-size:0.8rem; margin-top:4px">管理偏远地区邮编及附加费规则</p>
+  </div>
+  <div class="d-flex gap-1">
+    <a href="/pricing" class="btn btn-outline btn-sm">← 返回报价管理</a>
+    <button class="btn btn-primary btn-sm" onclick="openAddModal()">新增邮编</button>
+  </div>
+</div>
+
+<div class="card" style="padding:20px;">
+  <div class="toolbar">
+    <select id="pc-version" class="form-control" onchange="onVersionChange()">
+      {% for v in versions %}
+      <option value="{{ v.id }}" {% if selected_version_id == v.id %}selected{% endif %}>{{ v.name }}</option>
+      {% endfor %}
+    </select>
+    <input type="text" id="pc-search" class="form-control" placeholder="搜索邮编…" oninput="debounceSearch()">
+    <span class="stats" id="pc-stats"></span>
+  </div>
+
+  <div class="country-tags" id="country-tags"></div>
+
+  <div class="summary-strip" id="summary-strip"></div>
+
+  <div class="pc-grid" id="pc-grid">
+    <div class="text-center text-muted" style="grid-column:1/-1; padding:60px">加载中…</div>
+  </div>
+
+  <div class="pagination" id="pc-pagination"></div>
+</div>
+
+<div class="modal-overlay" id="modal-add-pc">
+  <div class="modal">
+    <div class="modal-header"><h3>新增偏远邮编</h3><button class="modal-close" onclick="closeModal('modal-add-pc')">&times;</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label>邮编 *</label><input type="text" id="add-postcode" class="form-control" placeholder="如：09001"></div>
+      <div class="form-group"><label>国家</label><input type="text" id="add-country" class="form-control" placeholder="如：意大利"></div>
+      <div class="form-group"><label>区域</label><input type="text" id="add-zone" class="form-control" placeholder="如：西西里岛"></div>
+      <div class="form-group"><label>附加费类型</label>
+        <select id="add-stype" class="form-control"><option value="per_kg">按公斤 (EUR/kg)</option><option value="per_piece">按件 (EUR/件)</option></select>
+      </div>
+      <div class="form-group"><label>金额</label><input type="number" step="0.01" id="add-amount" class="form-control" value="0.8"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-add-pc')">取消</button>
+      <button class="btn btn-primary" onclick="addPostcode()">保存</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let pcPage = 1, pcCountry = '', searchTimer = null;
+
+function getVersionId() { return document.getElementById('pc-version').value; }
+function onVersionChange() { pcPage = 1; pcCountry = ''; loadCountryTags(); loadPostcodes(); }
+function debounceSearch() { clearTimeout(searchTimer); searchTimer = setTimeout(() => { pcPage = 1; loadPostcodes(); }, 300); }
+
+async function loadCountryTags() {
+  try {
+    const data = await apiFetch(`/pricing/api/postcodes/countries?version_id=${getVersionId()}`);
+    const el = document.getElementById('country-tags');
+    const total = data.reduce((s, d) => s + d.count, 0);
+    el.innerHTML = `<span class="country-tag ${pcCountry===''?'active':''}" onclick="filterByCountry('')">全部<span class="cnt">${total}</span></span>`
+      + data.map(d => `<span class="country-tag ${pcCountry===d.country?'active':''}" onclick="filterByCountry('${d.country}')">${d.country}<span class="cnt">${d.count}</span></span>`).join('');
+  } catch(e) {}
+}
+
+function filterByCountry(c) { pcCountry = c; pcPage = 1; loadPostcodes(); loadCountryTags(); }
+
+async function loadPostcodes() {
+  const q = document.getElementById('pc-search').value.trim();
+  const params = new URLSearchParams({version_id:getVersionId(), page:pcPage, per_page:48});
+  if (q) params.set('q', q);
+  if (pcCountry) params.set('country', pcCountry);
+
+  try {
+    const data = await apiFetch(`/pricing/api/postcodes?${params}`);
+    document.getElementById('pc-stats').textContent = `共 ${data.total} 条`;
+
+    const strip = document.getElementById('summary-strip');
+    strip.innerHTML = `<div class="s-item">第 <span class="s-val">${data.page}</span> / <span class="s-val">${data.pages||1}</span> 页</div>
+      <div class="s-item">当前页 <span class="s-val">${data.items.length}</span> 条</div>`;
+
+    const grid = document.getElementById('pc-grid');
+    if (!data.items.length) {
+      grid.innerHTML = '<div class="text-center text-muted" style="grid-column:1/-1; padding:60px">无匹配数据</div>';
+      document.getElementById('pc-pagination').innerHTML = '';
+      return;
+    }
+
+    grid.innerHTML = data.items.map(p => {
+      const unitLabel = p.surcharge_type === 'per_kg' ? 'EUR/kg' : 'EUR/件';
+      return `<div class="pc-card" data-id="${p.id}">
+        <div class="pc-actions">
+          <button class="btn btn-danger btn-sm" style="padding:2px 8px; font-size:0.7rem" onclick="deletePostcode(${p.id})">删除</button>
+        </div>
+        <div class="pc-postcode"><span class="editable-val" onclick="startEdit(this,'postcode',${p.id})">${esc(p.postcode)}</span></div>
+        <div class="pc-meta">
+          <span><span class="label">国家</span><span class="editable-val" onclick="startEdit(this,'country',${p.id})">${esc(p.country||'-')}</span></span>
+        </div>
+        ${p.zone ? `<span class="pc-zone">${esc(p.zone)}</span>` : ''}
+        <div class="pc-fee">
+          <span class="amt"><span class="editable-val" onclick="startEdit(this,'surcharge_amount',${p.id})">${p.surcharge_amount}</span></span>
+          <span class="unit">${unitLabel}</span>
+        </div>
+      </div>`;
+    }).join('');
+
+    renderPagination(data.page, data.pages);
+  } catch(e) { showToast('加载失败','danger'); }
+}
+
+function renderPagination(cur, total) {
+  if (total <= 1) { document.getElementById('pc-pagination').innerHTML = ''; return; }
+  let btns = `<button ${cur<=1?'disabled':''} onclick="gotoPage(${cur-1})">上一页</button>`;
+  const range = [];
+  for (let i = Math.max(1,cur-2); i <= Math.min(total,cur+2); i++) range.push(i);
+  if (range[0] > 1) btns += `<button onclick="gotoPage(1)">1</button><span style="padding:0 4px">…</span>`;
+  range.forEach(p => btns += `<button class="${p===cur?'active':''}" onclick="gotoPage(${p})">${p}</button>`);
+  if (range[range.length-1] < total) btns += `<span style="padding:0 4px">…</span><button onclick="gotoPage(${total})">${total}</button>`;
+  btns += `<button ${cur>=total?'disabled':''} onclick="gotoPage(${cur+1})">下一页</button>`;
+  document.getElementById('pc-pagination').innerHTML = btns;
+}
+
+function gotoPage(p) { pcPage = p; loadPostcodes(); }
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function startEdit(el, field, id) {
+  if (el.querySelector('input')) return;
+  const old = el.textContent;
+  const isNum = field === 'surcharge_amount';
+  el.innerHTML = `<input class="inline-input" type="${isNum?'number':'text'}" value="${old}" ${isNum?'step="0.01"':''}>`;
+  const inp = el.querySelector('input');
+  inp.focus(); inp.select();
+  function finish() {
+    const val = inp.value.trim();
+    if (val === old) { el.textContent = old; return; }
+    const body = {}; body[field] = isNum ? parseFloat(val) : val;
+    apiFetch(`/pricing/api/postcodes/${id}`, {method:'PUT', body}).then(() => {
+      el.textContent = val; showToast('已保存','success');
+      if (field === 'country') { loadCountryTags(); }
+    }).catch(() => { el.textContent = old; showToast('保存失败','danger'); });
+  }
+  inp.addEventListener('blur', finish);
+  inp.addEventListener('keydown', e => { if(e.key==='Enter') inp.blur(); if(e.key==='Escape'){el.textContent=old;} });
+}
+
+async function deletePostcode(id) {
+  if (!confirm('确定删除此邮编？')) return;
+  try { await apiFetch(`/pricing/api/postcodes/${id}`, {method:'DELETE'}); showToast('已删除','success'); loadPostcodes(); loadCountryTags(); } catch(e) {}
+}
+
+function openAddModal() { openModal('modal-add-pc'); }
+
+async function addPostcode() {
+  const pc = document.getElementById('add-postcode').value.trim();
+  if (!pc) { showToast('邮编不能为空','danger'); return; }
+  try {
+    await apiFetch('/pricing/api/postcodes', {method:'POST', body:{
+      version_id: parseInt(getVersionId()), postcode: pc,
+      country: document.getElementById('add-country').value.trim(),
+      zone: document.getElementById('add-zone').value.trim(),
+      surcharge_type: document.getElementById('add-stype').value,
+      surcharge_amount: parseFloat(document.getElementById('add-amount').value || 0)
+    }});
+    showToast('已添加','success'); closeModal('modal-add-pc'); loadPostcodes(); loadCountryTags();
+  } catch(e) {}
+}
+
+onVersionChange();
+</script>
+{% endblock %}

@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}客户管理 - 汇森对账管理{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h2>客户管理</h2>
+  <button class="btn btn-primary" onclick="resetAndOpenAdd()">新增客户</button>
+</div>
+
+<div class="card">
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>客户名称</th>
+          <th>编码</th>
+          <th>结算币种</th>
+          <th>备注</th>
+          <th>创建时间</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="customer-table">
+        {% for c in customers %}
+        <tr id="row-{{ c.id }}"
+            data-id="{{ c.id }}"
+            data-name="{{ c.name }}"
+            data-code="{{ c.code or '' }}"
+            data-currency="{{ c.currency }}"
+            data-notes="{{ c.notes or '' }}">
+          <td style="font-weight:600">{{ c.name }}</td>
+          <td>{{ c.code or '-' }}</td>
+          <td><span class="badge badge-info">{{ c.currency }}</span></td>
+          <td class="text-muted">{{ c.notes or '-' }}</td>
+          <td>{{ c.created_at.strftime('%Y-%m-%d') if c.created_at else '-' }}</td>
+          <td>
+            <button class="btn btn-outline btn-sm btn-edit">编辑</button>
+            <button class="btn btn-danger btn-sm btn-delete">删除</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted" style="padding:40px">暂无客户数据</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-add">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">新增客户</h3>
+      <button class="modal-close" onclick="closeModal('modal-add')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-id" value="">
+      <div class="form-group">
+        <label>客户名称 *</label>
+        <input type="text" id="f-name" class="form-control" placeholder="例如：李志">
+      </div>
+      <div class="form-group">
+        <label>编码</label>
+        <input type="text" id="f-code" class="form-control" placeholder="例如：LZ">
+      </div>
+      <div class="form-group">
+        <label>结算币种</label>
+        <select id="f-currency" class="form-control">
+          <option value="EUR">EUR (欧元)</option>
+          <option value="CNY">CNY (人民币)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>备注</label>
+        <textarea id="f-notes" class="form-control" rows="3"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-add')">取消</button>
+      <button class="btn btn-primary" onclick="saveCustomer()">保存</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function resetAndOpenAdd() {
+  document.getElementById('edit-id').value = '';
+  document.getElementById('f-name').value = '';
+  document.getElementById('f-code').value = '';
+  document.getElementById('f-currency').value = 'EUR';
+  document.getElementById('f-notes').value = '';
+  document.getElementById('modal-title').textContent = '新增客户';
+  openModal('modal-add');
+}
+
+document.getElementById('customer-table').addEventListener('click', (e) => {
+  const row = e.target.closest('tr');
+  if (!row || !row.dataset.id) return;
+
+  if (e.target.closest('.btn-edit')) {
+    document.getElementById('edit-id').value = row.dataset.id;
+    document.getElementById('f-name').value = row.dataset.name;
+    document.getElementById('f-code').value = row.dataset.code;
+    document.getElementById('f-currency').value = row.dataset.currency;
+    document.getElementById('f-notes').value = row.dataset.notes;
+    document.getElementById('modal-title').textContent = '编辑客户';
+    openModal('modal-add');
+  }
+
+  if (e.target.closest('.btn-delete')) {
+    const name = row.dataset.name;
+    if (!confirm(`确定要删除客户 "${name}" 吗？`)) return;
+    apiFetch(`/customers/api/${row.dataset.id}`, { method: 'DELETE' })
+      .then(() => { showToast('已删除', 'success'); setTimeout(() => location.reload(), 600); })
+      .catch(() => {});
+  }
+});
+
+async function saveCustomer() {
+  const id = document.getElementById('edit-id').value;
+  const body = {
+    name: document.getElementById('f-name').value,
+    code: document.getElementById('f-code').value,
+    currency: document.getElementById('f-currency').value,
+    notes: document.getElementById('f-notes').value
+  };
+  try {
+    if (id) {
+      await apiFetch(`/customers/api/${id}`, { method: 'PUT', body });
+    } else {
+      await apiFetch('/customers/api', { method: 'POST', body });
+    }
+    showToast('保存成功', 'success');
+    setTimeout(() => location.reload(), 600);
+  } catch(e) {}
+}
+</script>
+{% endblock %}

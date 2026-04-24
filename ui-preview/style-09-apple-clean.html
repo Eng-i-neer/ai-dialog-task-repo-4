@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>汇森对账管理系统</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Noto Sans SC", "PingFang SC", "Helvetica Neue", sans-serif;
+      background: #f2f2f7;
+      min-height: 100vh;
+      color: #1c1c1e;
+      -webkit-font-smoothing: antialiased;
+    }
+    .layout {
+      display: flex;
+      min-height: 100vh;
+    }
+    .sidebar {
+      width: 260px;
+      flex-shrink: 0;
+      padding: 1.25rem 0.75rem;
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-right: none;
+      box-shadow: 0 0 1px rgba(0, 0, 0, 0.06);
+    }
+    .sidebar-inner {
+      border-radius: 12px;
+      padding: 0.5rem 0;
+    }
+    .sidebar-brand {
+      padding: 0.75rem 1rem 1.25rem;
+    }
+    .sidebar-brand h1 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1c1c1e;
+      letter-spacing: -0.02em;
+      line-height: 1.35;
+    }
+    .sidebar-brand p {
+      font-size: 0.75rem;
+      color: #8e8e93;
+      margin-top: 0.25rem;
+    }
+    .nav-list { list-style: none; }
+    .nav-list a {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.65rem 1rem;
+      margin: 0.15rem 0.5rem;
+      border-radius: 12px;
+      color: #3a3a3c;
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: background 0.15s ease;
+    }
+    .nav-list a:hover { background: rgba(0, 0, 0, 0.04); }
+    .nav-list a.active {
+      background: rgba(0, 122, 255, 0.12);
+      color: #007aff;
+      font-weight: 600;
+    }
+    .nav-icon { font-size: 1rem; opacity: 0.85; width: 1.35rem; text-align: center; }
+    .content {
+      flex: 1;
+      padding: 2rem 2rem 3rem;
+      overflow: auto;
+    }
+    .page-title {
+      font-size: 1.625rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: #1c1c1e;
+      margin-bottom: 0.35rem;
+    }
+    .page-sub {
+      font-size: 0.875rem;
+      color: #8e8e93;
+      margin-bottom: 1.75rem;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.75rem;
+    }
+    .stat-card {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 1.25rem 1.35rem;
+      box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
+    }
+    .stat-card .label {
+      font-size: 0.8125rem;
+      color: #8e8e93;
+      font-weight: 500;
+      margin-bottom: 0.4rem;
+    }
+    .stat-card .value {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: #1c1c1e;
+    }
+    .panel {
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 2px 20px rgba(0, 0, 0, 0.06);
+      overflow: hidden;
+    }
+    .panel-head {
+      padding: 1.1rem 1.35rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .panel-head h2 {
+      font-size: 1.0625rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: #1c1c1e;
+    }
+    .panel-actions { display: flex; gap: 0.5rem; }
+    .btn {
+      border: none;
+      background: #f2f2f7;
+      color: #007aff;
+      padding: 0.5rem 1rem;
+      border-radius: 12px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-primary {
+      background: #007aff;
+      color: #fff;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+    thead th {
+      text-align: left;
+      padding: 0.75rem 1.35rem;
+      background: #f2f2f7;
+      color: #636366;
+      font-weight: 600;
+      font-size: 0.8125rem;
+    }
+    tbody td {
+      padding: 0.85rem 1.35rem;
+      border-top: 1px solid rgba(0, 0, 0, 0.04);
+      color: #3a3a3c;
+    }
+    tbody tr:hover { background: rgba(0, 122, 255, 0.04); }
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.55rem;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-wait { background: #fff9e6; color: #b45309; }
+    .badge-done { background: #e8f8ef; color: #1a7f4c; }
+    .badge-export { background: #e5e5ea; color: #3a3a3c; }
+    @media (max-width: 900px) {
+      .layout { flex-direction: column; }
+      .sidebar { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" aria-label="侧边导航">
+      <div class="sidebar-inner">
+        <div class="sidebar-brand">
+          <h1>汇森对账管理系统</h1>
+          <p>简洁 · 高效</p>
+        </div>
+        <ul class="nav-list">
+          <li><a href="#" class="active"><span class="nav-icon">◈</span>仪表盘</a></li>
+          <li><a href="#"><span class="nav-icon">▣</span>导入管理</a></li>
+          <li><a href="#"><span class="nav-icon">▣</span>订单管理</a></li>
+          <li><a href="#"><span class="nav-icon">◇</span>客户管理</a></li>
+          <li><a href="#"><span class="nav-icon">◎</span>地区管理</a></li>
+          <li><a href="#"><span class="nav-icon">◐</span>计价规则</a></li>
+          <li><a href="#"><span class="nav-icon">◑</span>汇率管理</a></li>
+          <li><a href="#"><span class="nav-icon">▤</span>导出管理</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <main class="content">
+      <h1 class="page-title">仪表盘</h1>
+      <p class="page-sub">数据已同步 · 本期对账周期 2026年4月1日至4月8日</p>
+
+      <section class="stats" aria-label="统计卡片">
+        <div class="stat-card">
+          <div class="label">本期订单</div>
+          <div class="value">1,247</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">待处理</div>
+          <div class="value">89</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">已导出</div>
+          <div class="value">1,158</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">客户数</div>
+          <div class="value">11</div>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="orders-heading">
+        <div class="panel-head">
+          <h2 id="orders-heading">近期运单订单</h2>
+          <div class="panel-actions">
+            <button type="button" class="btn">筛选</button>
+            <button type="button" class="btn btn-primary">导出列表</button>
+          </div>
+        </div>
+        <div style="overflow-x: auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>运单号</th>
+                <th>目的地</th>
+                <th>客户</th>
+                <th>重量</th>
+                <th>状态</th>
+                <th>金额</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>HS-2026040800142</td>
+                <td>德国 · 法兰克福</td>
+                <td>华东跨境贸易有限公司</td>
+                <td>18.6 kg</td>
+                <td><span class="badge badge-wait">待处理</span></td>
+                <td>¥ 3,842.00</td>
+              </tr>
+              <tr>
+                <td>HS-2026040800098</td>
+                <td>荷兰 · 鹿特丹</td>
+                <td>汇通国际物流（上海）</td>
+                <td>42.3 kg</td>
+                <td><span class="badge badge-done">已核对</span></td>
+                <td>¥ 8,156.50</td>
+              </tr>
+              <tr>
+                <td>HS-2026040702156</td>
+                <td>比利时 · 安特卫普</td>
+                <td>德迅供应链科技</td>
+                <td>9.8 kg</td>
+                <td><span class="badge badge-export">已导出</span></td>
+                <td>¥ 1,290.00</td>
+              </tr>
+              <tr>
+                <td>HS-2026040701988</td>
+                <td>德国 · 慕尼黑</td>
+                <td>星航货运代理</td>
+                <td>65.0 kg</td>
+                <td><span class="badge badge-export">已导出</span></td>
+                <td>¥ 12,400.00</td>
+              </tr>
+              <tr>
+                <td>HS-2026040611033</td>
+                <td>法国 · 巴黎</td>
+                <td>华东跨境贸易有限公司</td>
+                <td>24.1 kg</td>
+                <td><span class="badge badge-wait">待处理</span></td>
+                <td>¥ 5,678.20</td>
+              </tr>
+              <tr>
+                <td>HS-2026040510876</td>
+                <td>奥地利 · 维也纳</td>
+                <td>远洋集运服务部</td>
+                <td>31.5 kg</td>
+                <td><span class="badge badge-done">已核对</span></td>
+                <td>¥ 6,920.00</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

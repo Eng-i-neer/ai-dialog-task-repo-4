@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+{% block title %}{{ order.waybill_no }} - 订单详情{% endblock %}
+
+{% block extra_css %}
+<style>
+.detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+@media (max-width:900px) { .detail-grid { grid-template-columns:1fr; } }
+
+.info-card { padding:24px; }
+.info-card h3 { font-size:0.9rem; font-weight:700; margin-bottom:16px; padding-bottom:10px; border-bottom:1px solid var(--border); }
+.info-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px 24px; font-size:0.85rem; }
+.info-grid .info-item { display:flex; flex-direction:column; gap:2px; }
+.info-grid .info-label { font-size:0.72rem; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; }
+.info-grid .info-value { font-weight:500; }
+.info-grid .info-span { grid-column:span 2; }
+
+.three-col { display:grid; grid-template-columns:1fr 1fr 2fr; gap:20px; margin-top:20px; }
+@media (max-width:1100px) { .three-col { grid-template-columns:1fr; } }
+
+.col-card { padding:20px; }
+.col-card h3 { font-size:0.88rem; font-weight:700; margin-bottom:4px; }
+.col-card .col-desc { font-size:0.75rem; color:var(--text-muted); margin-bottom:16px; }
+
+.sheet-tag {
+  display:inline-block; padding:4px 10px; background:var(--primary-light); color:var(--primary);
+  border-radius:999px; font-size:0.76rem; font-weight:600; margin:3px 2px;
+}
+.period-tag {
+  display:inline-block; padding:3px 8px; background:#FFF3E0; color:#E65100;
+  border-radius:999px; font-size:0.72rem; font-weight:600; margin:2px 2px;
+}
+
+.cod-value { font-size:1.4rem; font-weight:700; color:#2E7D32; }
+.cod-label { font-size:0.78rem; color:var(--text-muted); margin-top:4px; }
+
+.fee-row {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:10px 0; border-bottom:1px solid var(--border); font-size:0.84rem;
+}
+.fee-row:last-child { border-bottom:none; }
+.fee-row .fee-name { font-weight:600; }
+.fee-row .fee-source {
+  font-size:0.7rem; color:var(--text-muted); font-weight:400;
+  display:block; margin-top:2px;
+}
+.fee-row .fee-amt { font-weight:700; color:var(--primary); }
+.fee-row .fee-override { display:flex; align-items:center; gap:6px; }
+.fee-row .override-input {
+  width:80px; padding:3px 6px; border:1px solid var(--border); border-radius:var(--radius-sm);
+  font-size:0.82rem; outline:none; text-align:right;
+}
+.fee-row .override-input:focus { border-color:var(--primary); box-shadow:0 0 0 2px var(--primary-light); }
+.fee-row .btn-save {
+  padding:3px 10px; font-size:0.7rem; border:1px solid var(--primary); border-radius:var(--radius-sm);
+  background:var(--primary); color:#fff; cursor:pointer;
+}
+
+.fee-total-row {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:14px 0 4px; margin-top:4px; border-top:2px solid var(--border);
+  font-size:0.92rem; font-weight:700;
+}
+.fee-total-row .total-value { color:var(--primary); font-size:1.05rem; }
+
+.fee-empty { text-align:center; padding:30px; color:var(--text-muted); font-size:0.85rem; }
+
+.status-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:20px; }
+@media (max-width:700px) { .status-grid { grid-template-columns:1fr; } }
+.status-item {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:8px 12px; border-radius:var(--radius-sm);
+  font-size:0.8rem; background:var(--bg-subtle, #f8f8f8);
+}
+.status-item .status-name { font-weight:600; }
+.status-item .status-val { font-weight:700; }
+.status-item .status-val.collected { color:#2E7D32; }
+.status-item .status-val.pending { color:var(--text-muted); }
+.status-item .status-period { font-size:0.68rem; color:var(--text-muted); margin-left:6px; }
+
+.timeline-card { padding:24px; margin-top:20px; }
+.timeline-card h3 { font-size:0.9rem; font-weight:700; margin-bottom:16px; padding-bottom:10px; border-bottom:1px solid var(--border); }
+.timeline { position:relative; padding-left:28px; }
+.timeline::before {
+  content:''; position:absolute; left:9px; top:4px; bottom:4px;
+  width:2px; background:var(--border);
+}
+.timeline-item { position:relative; margin-bottom:20px; }
+.timeline-item:last-child { margin-bottom:0; }
+.timeline-dot {
+  position:absolute; left:-24px; top:4px;
+  width:12px; height:12px; border-radius:50%;
+  background:var(--border); border:2px solid #fff;
+}
+.timeline-item:last-child .timeline-dot { background:var(--primary); }
+.timeline-period { font-size:0.82rem; font-weight:700; margin-bottom:6px; }
+.timeline-fees { display:flex; flex-wrap:wrap; gap:4px; }
+.timeline-fee-tag {
+  display:inline-block; padding:2px 8px; border-radius:999px;
+  font-size:0.7rem; font-weight:500;
+  background:var(--bg-subtle, #f0f0f0); color:var(--text-muted);
+}
+.timeline-fee-tag.has-amount { background:#E8F5E9; color:#2E7D32; }
+.timeline-fee-tag.negative { background:#FFEBEE; color:#C62828; }
+.timeline-sheets { font-size:0.7rem; color:var(--text-muted); margin-top:4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2 style="font-size:1.1rem">{{ order.waybill_no }}</h2>
+    <p class="text-muted" style="font-size:0.8rem; margin-top:2px">
+      {{ order.customer.name if order.customer else '-' }} · {{ order.region.name if order.region else '-' }}
+      {% if order.import_period_list|length > 1 %}
+        · <span style="color:#E65100; font-weight:600;">{{ order.import_period_list|length }}个账期</span>
+      {% endif %}
+    </p>
+  </div>
+  <div class="d-flex gap-1">
+    <a href="{{ url_for('orders.order_list') }}" class="btn btn-outline btn-sm">← 返回列表</a>
+    <button class="btn btn-primary btn-sm" onclick="recalculate()">重新计算费用</button>
+    <button class="btn btn-danger btn-sm" onclick="deleteOrder({{ order.id }})">删除订单</button>
+  </div>
+</div>
+
+<div class="detail-grid">
+  <div class="card info-card">
+    <h3>基本信息</h3>
+    <div class="info-grid">
+      <div class="info-item"><span class="info-label">运单号</span><span class="info-value">{{ order.waybill_no }}</span></div>
+      <div class="info-item"><span class="info-label">转单号</span><span class="info-value">{{ order.transfer_no or '-' }}</span></div>
+      <div class="info-item"><span class="info-label">客户</span><span class="info-value">{{ order.customer.name if order.customer else '-' }}</span></div>
+      <div class="info-item"><span class="info-label">目的地</span><span class="info-value">{{ order.region.name if order.region else '-' }}</span></div>
+      <div class="info-item"><span class="info-label">客户单号</span><span class="info-value">{{ order.customer_ref or '-' }}</span></div>
+      <div class="info-item"><span class="info-label">运输方式</span><span class="info-value">{{ order.ship_type or '-' }}</span></div>
+      <div class="info-item"><span class="info-label">发货日期</span><span class="info-value">{{ order.ship_date.strftime('%Y-%m-%d') if order.ship_date else '-' }}</span></div>
+      <div class="info-item"><span class="info-label">首次账期</span><span class="info-value">{{ order.bill_period.strftime('%Y-%m-%d') if order.bill_period else '-' }}</span></div>
+      <div class="info-item"><span class="info-label">货物类型</span><span class="info-value">{% if order.cargo_type == 'GS' %}普货 (GS){% elif order.cargo_type == 'SC' %}特货 (SC){% elif order.cargo_type == 'IC' %}敏感货 (IC){% else %}{{ order.cargo_type or '-' }}{% endif %}</span></div>
+      <div class="info-item">
+        <span class="info-label">出现账期</span>
+        <span class="info-value">
+          {% for p in order.import_period_list %}
+            <span class="period-tag">{{ p[4:] }}期</span>
+          {% endfor %}
+          {% if not order.import_period_list %}-{% endif %}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card info-card">
+    <h3>重量与规格</h3>
+    <div class="info-grid">
+      <div class="info-item"><span class="info-label">实重 (kg)</span><span class="info-value" style="font-size:1rem; font-weight:700">{{ '%.3f'|format(order.actual_weight) if order.actual_weight else '-' }}</span></div>
+      <div class="info-item"><span class="info-label">件数</span><span class="info-value">{{ order.pieces or 1 }}</span></div>
+      <div class="info-item"><span class="info-label">头程计费重 (kg)</span><span class="info-value">{{ order.charge_weight_head or '-' }}</span></div>
+      <div class="info-item"><span class="info-label">尾程计费重 (kg)</span><span class="info-value">{{ order.charge_weight_tail or '-' }}</span></div>
+      <div class="info-item"><span class="info-label">尺寸</span><span class="info-value">{{ order.dimensions or '-' }}</span></div>
+      <div class="info-item"><span class="info-label">邮编</span><span class="info-value">{{ order.postcode or '-' }}{% if order.is_remote %} <span style="color:#C62828; font-weight:600;">(偏远)</span>{% endif %}</span></div>
+      <div class="info-item"><span class="info-label">货态</span><span class="info-value">{{ order.cargo_status or '-' }}</span></div>
+      <div class="info-item info-span"><span class="info-label">品名</span><span class="info-value">{{ order.product_name or '-' }}</span></div>
+      {% if order.address %}
+      <div class="info-item info-span"><span class="info-label">收件地址</span><span class="info-value">{{ order.address }}</span></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- 科目收取状态总览 -->
+<div class="card" style="padding:20px; margin-top:20px;">
+  <h3 style="font-size:0.9rem; font-weight:700; margin-bottom:12px;">科目收取状态</h3>
+  <div class="status-grid">
+    {% set all_fee_codes = ['HEAD_FREIGHT', 'TAIL_FREIGHT', 'COD_FEE', 'RETURN_FEE', 'SHELF_FEE', 'VAT', 'F_SURCHARGE', 'REMOTE_FEE', 'SECOND_DELIVERY'] %}
+    {% set fee_names = {'HEAD_FREIGHT':'头程运费', 'TAIL_FREIGHT':'尾程运费', 'COD_FEE':'COD手续费', 'RETURN_FEE':'退件操作费', 'SHELF_FEE':'上架费', 'VAT':'增值税', 'F_SURCHARGE':'附加费', 'REMOTE_FEE':'偏远费', 'SECOND_DELIVERY':'二次派送费'} %}
+    {% for code in all_fee_codes %}
+      {% set ns = namespace(found=false, amount=none, period='') %}
+      {% for fee in fees %}
+        {% if fee.category and fee.category.code == code %}
+          {% set ns.found = true %}
+          {% set this_amt = fee.override_amount if fee.override_amount is not none else fee.calculated_amount %}
+          {% if this_amt is not none %}
+            {% set ns.amount = this_amt %}
+            {% set ns.period = fee.period_label or '' %}
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+      <div class="status-item">
+        <span class="status-name">{{ fee_names.get(code, code) }}</span>
+        <span>
+          {% if ns.found and ns.amount is not none %}
+            <span class="status-val collected">{{ '%.2f'|format(ns.amount) }}</span>
+            {% if ns.period %}<span class="status-period">{{ ns.period }}导入</span>{% endif %}
+          {% elif ns.found %}
+            <span class="status-val pending">待计算</span>
+          {% else %}
+            <span class="status-val pending">未收取</span>
+          {% endif %}
+        </span>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="three-col">
+  <div class="card col-card">
+    <h3>导入科目</h3>
+    <div class="col-desc">该订单出现在代理账单中的哪些科目表</div>
+    {% set sheets = order.import_sheet_list %}
+    {% if sheets %}
+      {% for s in sheets %}
+        <span class="sheet-tag">{{ s }}</span>
+      {% endfor %}
+    {% else %}
+      <span style="color:var(--text-muted); font-size:0.82rem">未记录来源表</span>
+    {% endif %}
+
+    <div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--border); font-size:0.78rem; color:var(--text-muted);">
+      <strong>标记：</strong>
+      {% if order.has_head_freight %}头程 ✓ {% endif %}
+      {% if order.has_tail_freight %}尾程 ✓ {% endif %}
+      {% if order.needs_return_fee %}退件费 ✓ {% endif %}
+      {% if order.needs_shelf_fee %}上架费 ✓ {% endif %}
+      {% if order.needs_vat %}增值税 ✓ {% endif %}
+      {% if order.needs_second_delivery %}二派费 ✓ {% endif %}
+      {% if order.is_remote %}偏远 ✓ {% endif %}
+      {% if not order.has_head_freight and not order.has_tail_freight and not order.needs_return_fee and not order.needs_shelf_fee and not order.needs_vat and not order.needs_second_delivery and not order.is_remote %}
+        仅COD
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card col-card">
+    <h3>COD代收金额</h3>
+    <div class="col-desc">买方代收货款（非我方收费）</div>
+    {% if order.cod_amount %}
+      <div class="cod-value">{{ '%.2f'|format(order.cod_amount) }} {{ order.cod_currency or 'EUR' }}</div>
+      <div class="cod-label">此金额用于计算COD手续费</div>
+    {% else %}
+      <div style="color:var(--text-muted); font-size:0.85rem;">无COD代收</div>
+    {% endif %}
+  </div>
+
+  <div class="card col-card">
+    <h3>我们收费明细</h3>
+    <div class="col-desc">基于规则引擎计算 · 可手动覆盖</div>
+
+    {% if fees %}
+      {% for fee in fees %}
+      {% set final = fee.override_amount if fee.override_amount is not none else fee.calculated_amount %}
+      <div class="fee-row">
+        <div>
+          <span class="fee-name">{{ fee.category.name if fee.category else '未知' }}</span>
+          <span class="fee-source">
+            {% if fee.period_label %}{{ fee.period_label }}导入{% endif %}
+            {% if fee.source_sheet %} · {{ fee.source_sheet }}{% endif %}
+          </span>
+        </div>
+        <div class="fee-override">
+          <span class="fee-amt">{{ '%.2f'|format(final) if final else '-' }}</span>
+          <input type="number" step="0.01" class="override-input" id="override-{{ fee.id }}"
+                 value="{{ fee.override_amount if fee.override_amount is not none else '' }}" placeholder="覆盖">
+          <button class="btn-save" onclick="saveFee({{ order.id }}, {{ fee.id }})">保存</button>
+        </div>
+      </div>
+      {% endfor %}
+
+      <div class="fee-total-row">
+        <span>费用合计</span>
+        <span class="total-value">
+          {% set ns = namespace(total=0) %}
+          {% for fee in fees %}
+            {% set val = fee.override_amount if fee.override_amount is not none else fee.calculated_amount %}
+            {% if val %}{% set ns.total = ns.total + val %}{% endif %}
+          {% endfor %}
+          {{ '%.2f'|format(ns.total) }}
+        </span>
+      </div>
+    {% else %}
+      <div class="fee-empty">
+        尚未计算费用<br>
+        <button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="recalculate()">计算费用</button>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- 跨期记录时间线 -->
+{% if order.import_period_list|length > 1 %}
+<div class="card timeline-card">
+  <h3>跨期记录 · {{ order.waybill_no }}</h3>
+  <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:16px;">
+    该订单在 {{ order.import_period_list|length }} 个账期中被导入
+  </p>
+  <div class="timeline">
+    {% for period in order.import_period_list %}
+    <div class="timeline-item">
+      <div class="timeline-dot"></div>
+      <div class="timeline-period">{{ period[4:] }}期{% if loop.last %} (最新){% endif %}</div>
+      <div class="timeline-fees">
+        {% set ns_found = namespace(any=false) %}
+        {% for f in fees %}
+          {% if f.import_period == period %}
+            {% set ns_found.any = true %}
+            {% set amt = f.override_amount if f.override_amount is not none else f.calculated_amount %}
+            <span class="timeline-fee-tag {{ 'has-amount' if amt and amt > 0 else ('negative' if amt and amt < 0 else '') }}">
+              {{ f.category.name if f.category else '?' }}
+              {% if amt is not none %}: {{ '%.2f'|format(amt) }}{% endif %}
+            </span>
+          {% endif %}
+        {% endfor %}
+        {% if not ns_found.any %}
+          <span class="timeline-fee-tag">无费用变动</span>
+        {% endif %}
+      </div>
+      <div class="timeline-sheets">
+        {% for f in fees %}
+          {% if f.import_period == period and f.source_sheet %}
+            {{ f.source_sheet }}{% if not loop.last %}, {% endif %}
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if order.notes %}
+<div class="card mt-2" style="padding:20px;">
+  <h3 style="font-size:0.9rem; font-weight:700; margin-bottom:8px;">备注</h3>
+  <p style="font-size:0.85rem; color:var(--text-muted)">{{ order.notes }}</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function saveFee(orderId, feeId) {
+  const val = document.getElementById('override-' + feeId).value.trim();
+  try {
+    await apiFetch(`/orders/api/${orderId}/fees`, {
+      method:'POST',
+      body: { fee_id: feeId, override_amount: val ? parseFloat(val) : null }
+    });
+    showToast('保存成功', 'success');
+    setTimeout(() => location.reload(), 500);
+  } catch(e) {}
+}
+
+async function recalculate() {
+  try {
+    await apiFetch('/orders/api/batch-calculate', {
+      method:'POST',
+      body: { order_ids: [{{ order.id }}] }
+    });
+    showToast('费用计算完成', 'success');
+    setTimeout(() => location.reload(), 500);
+  } catch(e) {}
+}
+
+async function deleteOrder(orderId) {
+  if (!confirm('确定要删除此订单及其所有费用数据？')) return;
+  try {
+    await apiFetch(`/orders/api/${orderId}`, { method:'DELETE' });
+    showToast('已删除', 'success');
+    setTimeout(() => location.href = '/orders/', 500);
+  } catch(e) {}
+}
+</script>
+{% endblock %}

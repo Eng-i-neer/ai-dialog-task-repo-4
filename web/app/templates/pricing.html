@@ -1,0 +1,673 @@
+{% extends "base.html" %}
+{% block title %}计价规则 - 汇森对账管理{% endblock %}
+
+{% block extra_css %}
+<style>
+.version-timeline { display:flex; gap:12px; overflow-x:auto; padding:4px 0; }
+.version-card {
+  min-width:240px; padding:16px 20px; border-radius:var(--radius);
+  border:2px solid var(--border); background:var(--bg-card);
+  cursor:pointer; transition:all var(--transition); position:relative;
+}
+.version-card:hover { border-color:var(--primary); box-shadow:var(--shadow-lg); }
+.version-card.active { border-color:var(--primary); background:var(--primary-light); }
+.version-card .v-name { font-weight:700; font-size:0.95rem; margin-bottom:6px; padding-right:70px; }
+.version-card .v-date { font-size:0.8rem; color:var(--text-muted); }
+.version-card .v-rules { font-size:0.75rem; color:var(--text-muted); margin-top:4px; }
+.version-card .v-badge {
+  position:absolute; top:10px; right:12px; font-size:0.65rem; padding:2px 8px;
+  border-radius:999px; font-weight:600;
+}
+.v-badge-active { background:var(--success-bg); color:var(--success); }
+.v-badge-expired { background:rgba(0,0,0,0.06); color:var(--text-muted); }
+.version-actions { display:flex; gap:6px; margin-top:8px; }
+.version-actions .btn { font-size:0.7rem; padding:3px 10px; }
+
+.pricing-tabs { display:flex; gap:0; border-bottom:2px solid var(--border); margin-bottom:0; }
+.pricing-tab {
+  padding:10px 20px; font-size:0.85rem; font-weight:600;
+  cursor:pointer; color:var(--text-muted); border-bottom:2px solid transparent;
+  margin-bottom:-2px; transition:all var(--transition); background:none; border-top:none; border-left:none; border-right:none;
+}
+.pricing-tab:hover { color:var(--text); }
+.pricing-tab.active { color:var(--primary); border-bottom-color:var(--primary); }
+
+.tab-panel { display:none; padding:20px 0; }
+.tab-panel.active { display:block; }
+
+.search-bar { position:relative; margin-bottom:16px; max-width:320px; }
+.search-bar input { width:100%; padding:8px 12px 8px 36px; border:1px solid var(--border); border-radius:var(--radius-sm); font-size:0.85rem; background:var(--bg-card); color:var(--text); }
+.search-bar input:focus { border-color:var(--primary); outline:none; box-shadow:0 0 0 3px var(--primary-light); }
+.search-bar::before { content:'🔍'; position:absolute; left:10px; top:50%; transform:translateY(-50%); font-size:0.85rem; }
+
+.price-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:16px; }
+.country-card { border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-card); overflow:hidden; }
+.country-card.hidden { display:none; }
+.country-header {
+  padding:12px 16px; font-weight:700; font-size:0.9rem;
+  border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px;
+  background:var(--primary-light);
+}
+.country-header .flag { font-size:1.2rem; }
+.country-header .code { font-size:0.75rem; color:var(--text-muted); font-weight:500; }
+.country-body table { width:100%; border-collapse:collapse; font-size:0.8rem; }
+.country-body th { background:transparent; font-weight:600; color:var(--text-muted); font-size:0.7rem; text-transform:uppercase; letter-spacing:0.5px; }
+.country-body th, .country-body td { padding:8px 12px; text-align:left; border-bottom:1px solid var(--border); }
+.country-body tr:last-child td { border-bottom:none; }
+.country-body .val { font-weight:600; color:var(--text); }
+.country-body .unit { font-size:0.7rem; color:var(--text-muted); }
+.country-footer {
+  padding:8px 16px; font-size:0.75rem; color:var(--text-muted);
+  border-top:1px solid var(--border); background:rgba(0,0,0,0.015);
+  display:flex; gap:16px; flex-wrap:wrap;
+}
+
+.editable {
+  cursor:pointer; border-bottom:1px dashed var(--primary); padding-bottom:1px;
+  transition:background var(--transition);
+}
+.editable:hover { background:var(--primary-light); border-radius:2px; }
+
+.global-rules { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:12px; }
+.global-card { border:1px solid var(--border); border-radius:var(--radius); padding:16px; background:var(--bg-card); }
+.global-card h4 { font-size:0.85rem; font-weight:700; margin-bottom:8px; }
+.global-card .detail { font-size:0.8rem; color:var(--text); line-height:1.8; }
+.global-card a.link { color:var(--primary); text-decoration:none; font-weight:600; }
+.global-card a.link:hover { text-decoration:underline; }
+
+.empty-state { text-align:center; padding:60px 20px; color:var(--text-muted); }
+.empty-state .icon { font-size:3rem; margin-bottom:12px; }
+
+.override-row { display:grid; grid-template-columns:120px 100px 100px 1fr auto; gap:8px; align-items:center; padding:10px 16px; border-bottom:1px solid var(--border); font-size:0.8rem; }
+.override-row:last-child { border-bottom:none; }
+
+.inline-edit-overlay {
+  position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.3);
+  z-index:1000; display:flex; align-items:center; justify-content:center;
+}
+.inline-edit-box {
+  background:var(--bg-card); border-radius:var(--radius); padding:24px;
+  min-width:360px; max-width:480px; box-shadow:var(--shadow-lg);
+}
+.inline-edit-box h4 { font-size:0.9rem; font-weight:700; margin-bottom:16px; }
+.inline-edit-box .form-row { display:flex; gap:12px; margin-bottom:12px; }
+.inline-edit-box .form-row .form-group { flex:1; margin:0; }
+.inline-edit-box .form-row label { font-size:0.75rem; font-weight:600; color:var(--text-muted); margin-bottom:4px; display:block; }
+.inline-edit-box .form-row input { width:100%; padding:6px 10px; border:1px solid var(--border); border-radius:var(--radius-sm); font-size:0.85rem; }
+.inline-edit-box .actions { display:flex; gap:8px; justify-content:flex-end; margin-top:16px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h2>计价规则</h2>
+  <div class="d-flex gap-1">
+    <button class="btn btn-outline btn-sm" onclick="openModal('modal-version')">手动新增版本</button>
+    <a href="/imports" class="btn btn-primary btn-sm">上传报价文件</a>
+  </div>
+</div>
+
+<div class="card mb-3" style="padding:20px;">
+  <h3 style="font-size:0.9rem; font-weight:700; margin-bottom:12px;">报价版本</h3>
+  <div class="version-timeline" id="version-timeline">
+    {% for v in versions %}
+    <div class="version-card" data-id="{{ v.id }}" data-name="{{ v.name }}">
+      {% if v.is_active %}
+      <span class="v-badge v-badge-active">当前生效</span>
+      {% else %}
+      <span class="v-badge v-badge-expired">未激活</span>
+      {% endif %}
+      <div class="v-name">{{ v.name }}</div>
+      <div class="v-date">
+        {{ v.effective_date.strftime('%Y-%m-%d') if v.effective_date else '-' }}
+        → {{ v.expire_date.strftime('%Y-%m-%d') if v.expire_date else '至今' }}
+      </div>
+      <div class="v-rules">{{ v.rules.count() }} 条规则{% if v.source_file %} · {{ v.source_file }}{% endif %}</div>
+      <div class="version-actions">
+        <button class="btn btn-outline btn-sm btn-view" onclick="selectVersion({{ v.id }},'{{ v.name }}')">查看</button>
+        {% if not v.is_active %}
+        <button class="btn btn-primary btn-sm" onclick="activateVersion({{ v.id }})">设为生效</button>
+        {% endif %}
+        <button class="btn btn-danger btn-sm" onclick="deleteVersion({{ v.id }},'{{ v.name }}')">删除</button>
+      </div>
+    </div>
+    {% else %}
+    <div class="empty-state" style="padding:30px; width:100%;">
+      <p>暂无报价版本，请先<a href="/imports">上传报价文件</a></p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div id="pricing-detail" style="display:none">
+  <div class="card">
+    <div style="padding:0 20px;">
+      <div class="pricing-tabs">
+        <button class="pricing-tab active" data-tab="freight">运费价格</button>
+        <button class="pricing-tab" data-tab="fees">手续费 / 退件</button>
+        <button class="pricing-tab" data-tab="misc">杂费 / 附加费</button>
+        <button class="pricing-tab" data-tab="overrides">客户定制</button>
+        <button class="pricing-tab" data-tab="raw">原始规则</button>
+      </div>
+    </div>
+
+    <div class="tab-panel active" id="panel-freight" style="padding:20px;">
+      <div class="search-bar"><input type="text" id="search-freight" placeholder="搜索国家名称或代码…" oninput="filterCountries('freight')"></div>
+      <div class="price-grid" id="freight-grid"></div>
+    </div>
+
+    <div class="tab-panel" id="panel-fees" style="padding:20px;">
+      <div class="search-bar"><input type="text" id="search-fees" placeholder="搜索国家名称或代码…" oninput="filterCountries('fees')"></div>
+      <div class="price-grid" id="fees-grid"></div>
+    </div>
+
+    <div class="tab-panel" id="panel-misc" style="padding:20px;">
+      <div class="global-rules" id="misc-grid"></div>
+    </div>
+
+    <div class="tab-panel" id="panel-overrides" style="padding:20px;">
+      <div class="d-flex align-center gap-1 mb-2">
+        <select id="override-customer" class="form-control" style="max-width:200px" onchange="loadOverrides()">
+          <option value="">选择客户查看定制规则</option>
+          {% for c in customers %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="openModal('modal-override')">新增定制</button>
+      </div>
+      <div class="card" id="overrides-container" style="border:1px solid var(--border);">
+        <div class="text-center text-muted" style="padding:40px; font-size:0.85rem">请选择客户</div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="panel-raw" style="padding:20px;">
+      <div class="d-flex align-center justify-between mb-2">
+        <span class="text-muted" style="font-size:0.8rem">开发者视图 · 所有规则原始数据</span>
+        <button class="btn btn-primary btn-sm" onclick="openModal('modal-rule')">新增规则</button>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>科目</th><th>地区</th><th>货物类型</th><th>规则类型</th><th>参数</th><th>操作</th></tr></thead>
+          <tbody id="rules-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 内联编辑弹框容器 -->
+<div id="inline-edit-root"></div>
+
+<!-- 模态框：新增版本 -->
+<div class="modal-overlay" id="modal-version">
+  <div class="modal">
+    <div class="modal-header"><h3>手动新增报价版本</h3><button class="modal-close" onclick="closeModal('modal-version')">&times;</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label>版本名称 *</label><input type="text" id="v-name" class="form-control" placeholder="如：东欧COD报价20260331"></div>
+      <div class="form-group"><label>生效日期 *</label><input type="date" id="v-date" class="form-control"></div>
+      <div class="form-group"><label>失效日期</label><input type="date" id="v-expire" class="form-control"></div>
+      <div class="form-group"><label>备注</label><textarea id="v-notes" class="form-control" rows="2"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-version')">取消</button>
+      <button class="btn btn-primary" onclick="saveVersion()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 模态框：新增规则 -->
+<div class="modal-overlay" id="modal-rule">
+  <div class="modal">
+    <div class="modal-header"><h3>新增计价规则</h3><button class="modal-close" onclick="closeModal('modal-rule')">&times;</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label>科目 *</label>
+        <select id="r-category" class="form-control" onchange="onRuleCategoryChange()">{% for cat in categories %}<option value="{{ cat.id }}" data-code="{{ cat.code }}">{{ cat.name }}</option>{% endfor %}</select>
+      </div>
+      <div class="form-group"><label>地区</label>
+        <select id="r-region" class="form-control"><option value="">全部地区</option>{% for r in regions %}<option value="{{ r.id }}">{{ r.name }} ({{ r.code }})</option>{% endfor %}</select>
+      </div>
+      <div class="form-group"><label>货物类型</label>
+        <select id="r-cargo" class="form-control"><option value="">全部</option><option value="GS">普货(GS)</option><option value="SC">特货(SC)</option><option value="IC">敏感货(IC)</option></select>
+      </div>
+      <div id="rule-fields-dynamic"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-rule')">取消</button>
+      <button class="btn btn-primary" onclick="saveRule()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 模态框：客户定制 -->
+<div class="modal-overlay" id="modal-override">
+  <div class="modal">
+    <div class="modal-header"><h3>新增客户定制规则</h3><button class="modal-close" onclick="closeModal('modal-override')">&times;</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label>客户 *</label><select id="o-customer" class="form-control">{% for c in customers %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
+      <div class="form-group"><label>科目 *</label><select id="o-category" class="form-control" onchange="onOverrideCategoryChange()">{% for cat in categories %}<option value="{{ cat.id }}" data-code="{{ cat.code }}">{{ cat.name }}</option>{% endfor %}</select></div>
+      <div class="form-group"><label>地区</label><select id="o-region" class="form-control"><option value="">全部</option>{% for r in regions %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}</select></div>
+      <div id="override-fields-dynamic"></div>
+      <div class="form-group"><label>生效日期</label><input type="date" id="o-date" class="form-control"></div>
+      <div class="form-group"><label>备注</label><input type="text" id="o-notes" class="form-control"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-override')">取消</button>
+      <button class="btn btn-primary" onclick="saveOverride()">保存</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentVersionId = null;
+let currentVersionName = '';
+let cachedSummary = null;
+
+const FLAGS = {PL:'🇵🇱',RO:'🇷🇴',HU:'🇭🇺',CZ:'🇨🇿',SK:'🇸🇰',BG:'🇧🇬',HR:'🇭🇷',SI:'🇸🇮',ES:'🇪🇸',PT:'🇵🇹',GR:'🇬🇷',IT:'🇮🇹',AT:'🇦🇹',DE:'🇩🇪',EE:'🇪🇪',LT:'🇱🇹',LV:'🇱🇻'};
+
+/* ========== Tab switching ========== */
+document.querySelector('.pricing-tabs').addEventListener('click', e => {
+  const btn = e.target.closest('.pricing-tab');
+  if (!btn) return;
+  document.querySelectorAll('.pricing-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(`panel-${btn.dataset.tab}`).classList.add('active');
+});
+
+/* ========== Version management ========== */
+function selectVersion(id, name) {
+  currentVersionId = id;
+  currentVersionName = name;
+  document.querySelectorAll('.version-card').forEach(c => c.classList.remove('active'));
+  const card = document.querySelector(`.version-card[data-id="${id}"]`);
+  if (card) card.classList.add('active');
+  document.getElementById('pricing-detail').style.display = '';
+  loadVersionSummary(id);
+}
+
+async function activateVersion(id) {
+  if (!confirm('将此版本设为唯一生效版本，其他版本将自动过期。确定？')) return;
+  try {
+    const data = await apiFetch(`/pricing/api/versions/${id}/activate`, {method:'POST'});
+    showToast(data.message, 'success');
+    setTimeout(() => location.reload(), 600);
+  } catch(e) {}
+}
+
+async function deleteVersion(id, name) {
+  if (!confirm(`确定删除版本"${name}"及其所有规则？此操作不可恢复。`)) return;
+  try {
+    await apiFetch(`/pricing/api/versions/${id}`, {method:'DELETE'});
+    showToast('已删除', 'success');
+    setTimeout(() => location.reload(), 600);
+  } catch(e) {}
+}
+
+async function saveVersion() {
+  try {
+    await apiFetch('/pricing/api/versions', {method:'POST', body:{
+      name: document.getElementById('v-name').value,
+      effective_date: document.getElementById('v-date').value,
+      expire_date: document.getElementById('v-expire').value || null,
+      notes: document.getElementById('v-notes').value
+    }});
+    showToast('保存成功','success');
+    setTimeout(() => location.reload(), 600);
+  } catch(e) {}
+}
+
+/* ========== Load & render ========== */
+async function loadVersionSummary(versionId) {
+  try {
+    cachedSummary = await apiFetch(`/pricing/api/versions/${versionId}/summary`);
+    renderFreightTab(cachedSummary);
+    renderFeesTab(cachedSummary);
+    renderMiscTab(cachedSummary);
+    loadRawRules(versionId);
+  } catch(e) {}
+}
+
+/* ========== Country search ========== */
+function filterCountries(tab) {
+  const q = document.getElementById(`search-${tab}`).value.trim().toLowerCase();
+  document.querySelectorAll(`#${tab}-grid .country-card`).forEach(card => {
+    const name = (card.dataset.name || '').toLowerCase();
+    const code = (card.dataset.code || '').toLowerCase();
+    card.classList.toggle('hidden', q && !name.includes(q) && !code.includes(q));
+  });
+}
+
+/* ========== Freight tab ========== */
+function renderFreightTab(data) {
+  const grid = document.getElementById('freight-grid');
+  if (!data.countries?.length) { grid.innerHTML = '<div class="empty-state"><div class="icon">📦</div><p>暂无运费数据</p></div>'; return; }
+
+  grid.innerHTML = data.countries.map(c => {
+    const f = c.freight;
+    const flag = FLAGS[c.code] || '🏳️';
+    const carrier = f.GS?.carrier || f.SC?.carrier || '';
+
+    let rows = '';
+    for (const [code, label] of [['GS','普货'],['SC','特货'],['IC','敏感货']]) {
+      const d = f[code] || {};
+      const hrid = d.head_rule_id;
+      const trid = d.tail_rule_id;
+      rows += `<tr>
+        <td style="font-weight:600">${label}</td>
+        <td>${hrid ? `<span class="editable val" onclick="editRule(${hrid},'head','${c.name} ${label} 头程')">${d.head}</span>` : '<span class="val">-</span>'} <span class="unit">EUR/kg</span></td>
+        <td>${trid ? `<span class="editable val" onclick="editRule(${trid},'tail','${c.name} ${label} 尾程')">${d.tail_first}</span>` : '<span class="val">-</span>'} <span class="unit">EUR</span></td>
+        <td>${trid ? `<span class="editable val" onclick="editRule(${trid},'tail','${c.name} ${label} 尾程')">${d.tail_extra}</span>` : '<span class="val">-</span>'} <span class="unit">EUR/kg</span></td>
+      </tr>`;
+    }
+
+    return `<div class="country-card" data-name="${c.name}" data-code="${c.code}">
+      <div class="country-header"><span class="flag">${flag}</span>${c.name}<span class="code">${c.code}</span></div>
+      <div class="country-body"><table>
+        <thead><tr><th>类型</th><th>头程/kg</th><th>尾程首2KG</th><th>续1KG</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+      ${carrier ? `<div class="country-footer"><span>🚚 ${carrier}</span></div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+/* ========== Fees tab ========== */
+function renderFeesTab(data) {
+  const grid = document.getElementById('fees-grid');
+  if (!data.countries?.length) { grid.innerHTML = '<div class="empty-state"><div class="icon">💰</div><p>暂无数据</p></div>'; return; }
+
+  grid.innerHTML = data.countries.map(c => {
+    const flag = FLAGS[c.code] || '🏳️';
+    const cod = c.cod;
+    const ret = c.return_fee;
+    let lines = '';
+
+    if (cod) {
+      const pct = (cod.rate*100).toFixed(0);
+      lines += `<div><strong>COD手续费：</strong>
+        <span class="editable" onclick="editRule(${cod.rule_id},'cod','${c.name} COD')">${pct}%，最低 ${cod.min_amount} EUR</span></div>`;
+    } else {
+      lines += `<div class="text-muted">COD手续费：跟随默认（3%，最低1.5EUR）</div>`;
+    }
+
+    if (ret) {
+      const txt = ret.ratio < 1 ? `派送费 × ${(ret.ratio*100).toFixed(0)}%` : '同派送费 (100%)';
+      lines += `<div><strong>退件规则：</strong>
+        <span class="editable" onclick="editRule(${ret.rule_id},'return','${c.name} 退件')">${txt}</span></div>`;
+      if (ret.first_price) lines += `<div class="text-muted" style="padding-left:12px">基准：首2KG ${ret.first_price}EUR + 续${ret.extra_per_kg}EUR/kg</div>`;
+    } else {
+      lines += `<div class="text-muted">退件规则：无数据</div>`;
+    }
+
+    return `<div class="country-card" data-name="${c.name}" data-code="${c.code}">
+      <div class="country-header"><span class="flag">${flag}</span>${c.name}<span class="code">${c.code}</span></div>
+      <div class="country-body" style="padding:12px 16px; font-size:0.8rem; line-height:2;">${lines}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ========== Misc tab ========== */
+function renderMiscTab(data) {
+  const grid = document.getElementById('misc-grid');
+  const g = data.global || {};
+  let html = '';
+
+  if (g.shelf_fee) {
+    const rid = g.shelf_fee._rule_id;
+    html += `<div class="global-card"><h4>📦 上架费</h4>
+      <div class="detail">${rid ? `<span class="editable val" onclick="editRule(${rid},'fixed','上架费')">${g.shelf_fee.amount}</span>` : `<span class="val">${g.shelf_fee.amount}</span>`} EUR/票</div></div>`;
+  }
+  if (g.f_surcharge?.length) {
+    const labels = {'SC':'电子烟/保健品(特货)','IC':'F货/纯电(敏感货)','F手表':'F手表'};
+    const lines = g.f_surcharge.map(f => {
+      return `<div>${labels[f.cargo_type]||f.cargo_type}：${f.rule_id ? `<span class="editable val" onclick="editRule(${f.rule_id},'fixed','F附加费 ${f.cargo_type}')">${f.amount}</span>` : `<span class="val">${f.amount}</span>`} ${f.currency}/票</div>`;
+    }).join('');
+    html += `<div class="global-card"><h4>⚡ F附加费</h4><div class="detail">${lines}</div></div>`;
+  }
+  if (g.remote_fee) {
+    const zones = g.remote_fee.zones || {};
+    let lines = '';
+    for (const [zone, info] of Object.entries(zones)) {
+      lines += `<div>${zone}：+<span class="val">${info.amount}</span> ${info.type==='per_kg'?'EUR/kg':'EUR/件'}</div>`;
+    }
+    const remoteRid = g.remote_fee._rule_id;
+    html += `<div class="global-card"><h4>🏝️ 偏远附加费</h4>
+      <div class="detail">${lines}</div>
+      <div style="margin-top:10px"><a class="link" href="/pricing/remote-postcodes?version_id=${currentVersionId}">管理 ${g.postcodes_count||0} 个偏远邮编 →</a></div>
+    </div>`;
+  }
+  if (!html) html = '<div class="empty-state" style="grid-column:1/-1"><div class="icon">📋</div><p>暂无杂费规则</p></div>';
+  grid.innerHTML = html;
+}
+
+/* ========== Inline edit ========== */
+async function editRule(ruleId, type, title) {
+  let rule;
+  try {
+    const rules = await apiFetch(`/pricing/api/rules/${currentVersionId}`);
+    rule = rules.find(r => r.id === ruleId);
+  } catch(e) { return; }
+  if (!rule) { showToast('规则未找到','danger'); return; }
+
+  const p = rule.params || {};
+  let fields = '';
+
+  if (type === 'head') {
+    fields = `<div class="form-row"><div class="form-group"><label>单价 (EUR/kg)</label><input id="ie-rate" type="number" step="0.01" value="${p.rate_per_kg||''}"></div></div>`;
+  } else if (type === 'tail') {
+    fields = `<div class="form-row">
+      <div class="form-group"><label>首2KG价格 (EUR)</label><input id="ie-first" type="number" step="0.1" value="${p.first_price||''}"></div>
+      <div class="form-group"><label>续重单价 (EUR/kg)</label><input id="ie-extra" type="number" step="0.01" value="${p.extra_per_kg||''}"></div>
+    </div>`;
+  } else if (type === 'cod') {
+    fields = `<div class="form-row">
+      <div class="form-group"><label>费率 (%)</label><input id="ie-codrate" type="number" step="0.1" value="${((p.rate||0)*100).toFixed(1)}"></div>
+      <div class="form-group"><label>最低收费 (EUR)</label><input id="ie-codmin" type="number" step="0.1" value="${p.min_amount||''}"></div>
+    </div>`;
+  } else if (type === 'return') {
+    fields = `<div class="form-row">
+      <div class="form-group"><label>退件比例 (%)</label><input id="ie-ratio" type="number" step="1" value="${((p.return_ratio||1)*100).toFixed(0)}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>首2KG价格 (EUR)</label><input id="ie-rfirst" type="number" step="0.1" value="${p.first_price||''}"></div>
+      <div class="form-group"><label>续重 (EUR/kg)</label><input id="ie-rextra" type="number" step="0.01" value="${p.extra_per_kg||''}"></div>
+    </div>`;
+  } else if (type === 'fixed') {
+    fields = `<div class="form-row">
+      <div class="form-group"><label>金额</label><input id="ie-amount" type="number" step="0.01" value="${p.amount||''}"></div>
+      <div class="form-group"><label>币种</label><select id="ie-currency" class="form-control" style="padding:6px 10px"><option ${(p.currency||'EUR')==='EUR'?'selected':''}>EUR</option><option ${p.currency==='CNY'?'selected':''}>CNY</option></select></div>
+    </div>`;
+  }
+
+  const root = document.getElementById('inline-edit-root');
+  root.innerHTML = `<div class="inline-edit-overlay" onclick="if(event.target===this)closeInlineEdit()">
+    <div class="inline-edit-box">
+      <h4>编辑 · ${title}</h4>
+      ${fields}
+      <div class="actions">
+        <button class="btn btn-outline btn-sm" onclick="closeInlineEdit()">取消</button>
+        <button class="btn btn-primary btn-sm" onclick="saveInlineEdit(${ruleId},'${type}')">保存</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function closeInlineEdit() { document.getElementById('inline-edit-root').innerHTML = ''; }
+
+async function saveInlineEdit(ruleId, type) {
+  let newParams = {};
+  try {
+    const rules = await apiFetch(`/pricing/api/rules/${currentVersionId}`);
+    const rule = rules.find(r => r.id === ruleId);
+    if (rule) newParams = {...(rule.params || {})};
+  } catch(e) {}
+
+  if (type === 'head') {
+    newParams.rate_per_kg = parseFloat(document.getElementById('ie-rate').value);
+  } else if (type === 'tail') {
+    newParams.first_price = parseFloat(document.getElementById('ie-first').value);
+    newParams.extra_per_kg = parseFloat(document.getElementById('ie-extra').value);
+  } else if (type === 'cod') {
+    newParams.rate = parseFloat(document.getElementById('ie-codrate').value) / 100;
+    newParams.min_amount = parseFloat(document.getElementById('ie-codmin').value);
+  } else if (type === 'return') {
+    newParams.return_ratio = parseFloat(document.getElementById('ie-ratio').value) / 100;
+    newParams.first_price = parseFloat(document.getElementById('ie-rfirst').value);
+    newParams.extra_per_kg = parseFloat(document.getElementById('ie-rextra').value);
+  } else if (type === 'fixed') {
+    newParams.amount = parseFloat(document.getElementById('ie-amount').value);
+    newParams.currency = document.getElementById('ie-currency').value;
+  }
+
+  try {
+    await apiFetch(`/pricing/api/rules/${ruleId}`, {method:'PUT', body:{params:newParams}});
+    showToast('已保存','success');
+    closeInlineEdit();
+    loadVersionSummary(currentVersionId);
+  } catch(e) {}
+}
+
+/* ========== Dynamic rule form fields ========== */
+function buildDynamicFields(catCode, prefix) {
+  const container = document.getElementById(`${prefix}-fields-dynamic`);
+  let html = '';
+  if (catCode === 'HEAD_FREIGHT') {
+    html = `<div class="form-group"><label>单价 (EUR/kg)</label><input type="number" step="0.01" id="${prefix}-f-rate" class="form-control" placeholder="9.7"></div>`;
+  } else if (catCode === 'TAIL_FREIGHT') {
+    html = `<div class="form-group"><label>首2KG价格 (EUR)</label><input type="number" step="0.1" id="${prefix}-f-first" class="form-control" placeholder="4.0"></div>
+            <div class="form-group"><label>续重单价 (EUR/kg)</label><input type="number" step="0.01" id="${prefix}-f-extra" class="form-control" placeholder="0.9"></div>`;
+  } else if (catCode === 'COD_FEE') {
+    html = `<div class="form-group"><label>费率 (%)</label><input type="number" step="0.1" id="${prefix}-f-codrate" class="form-control" value="3"></div>
+            <div class="form-group"><label>最低收费 (EUR)</label><input type="number" step="0.1" id="${prefix}-f-codmin" class="form-control" value="1.5"></div>`;
+  } else if (catCode === 'RETURN_FEE') {
+    html = `<div class="form-group"><label>退件比例 (%)</label><input type="number" step="1" id="${prefix}-f-ratio" class="form-control" value="70"></div>
+            <div class="form-group"><label>首2KG价格 (EUR)</label><input type="number" step="0.1" id="${prefix}-f-rfirst" class="form-control"></div>
+            <div class="form-group"><label>续重 (EUR/kg)</label><input type="number" step="0.01" id="${prefix}-f-rextra" class="form-control"></div>`;
+  } else if (catCode === 'SHELF_FEE' || catCode === 'F_SURCHARGE' || catCode === 'MISC_FEE') {
+    html = `<div class="form-group"><label>金额</label><input type="number" step="0.01" id="${prefix}-f-amount" class="form-control" placeholder="1.5"></div>
+            <div class="form-group"><label>币种</label><select id="${prefix}-f-currency" class="form-control"><option>EUR</option><option>CNY</option></select></div>`;
+  } else {
+    html = `<div class="form-group"><label>参数 (JSON)</label><textarea id="${prefix}-f-json" class="form-control" rows="3" placeholder='{"key":"value"}'></textarea></div>`;
+  }
+  container.innerHTML = html;
+}
+
+function getCatCode(selectId) {
+  const sel = document.getElementById(selectId);
+  return sel.options[sel.selectedIndex]?.dataset?.code || '';
+}
+
+function onRuleCategoryChange() { buildDynamicFields(getCatCode('r-category'), 'rule'); }
+function onOverrideCategoryChange() { buildDynamicFields(getCatCode('o-category'), 'override'); }
+
+function collectParams(prefix, catCode) {
+  if (catCode === 'HEAD_FREIGHT') return {rule_type:'per_kg', params:{rate_per_kg:parseFloat(document.getElementById(`${prefix}-f-rate`)?.value||0)}};
+  if (catCode === 'TAIL_FREIGHT') return {rule_type:'first_extra', params:{first_weight:2, first_price:parseFloat(document.getElementById(`${prefix}-f-first`)?.value||0), extra_per_kg:parseFloat(document.getElementById(`${prefix}-f-extra`)?.value||0)}};
+  if (catCode === 'COD_FEE') return {rule_type:'percentage', params:{rate:parseFloat(document.getElementById(`${prefix}-f-codrate`)?.value||3)/100, min_amount:parseFloat(document.getElementById(`${prefix}-f-codmin`)?.value||1.5)}};
+  if (catCode === 'RETURN_FEE') return {rule_type:'first_extra', params:{return_ratio:parseFloat(document.getElementById(`${prefix}-f-ratio`)?.value||100)/100, first_price:parseFloat(document.getElementById(`${prefix}-f-rfirst`)?.value||0), extra_per_kg:parseFloat(document.getElementById(`${prefix}-f-rextra`)?.value||0)}};
+  if (['SHELF_FEE','F_SURCHARGE','MISC_FEE'].includes(catCode)) return {rule_type:'fixed', params:{amount:parseFloat(document.getElementById(`${prefix}-f-amount`)?.value||0), currency:document.getElementById(`${prefix}-f-currency`)?.value||'EUR'}};
+  try { return {rule_type:'fixed', params:JSON.parse(document.getElementById(`${prefix}-f-json`)?.value||'{}')}; }
+  catch(e) { showToast('参数格式错误','danger'); return null; }
+}
+
+/* ========== Save rule (new form) ========== */
+async function saveRule() {
+  const catCode = getCatCode('r-category');
+  const collected = collectParams('rule', catCode);
+  if (!collected) return;
+  try {
+    await apiFetch('/pricing/api/rules', {method:'POST', body:{
+      version_id: currentVersionId,
+      category_id: parseInt(document.getElementById('r-category').value),
+      region_id: document.getElementById('r-region').value || null,
+      cargo_type: document.getElementById('r-cargo').value || null,
+      rule_type: collected.rule_type,
+      params: collected.params
+    }});
+    showToast('规则已添加','success');
+    closeModal('modal-rule');
+    loadVersionSummary(currentVersionId);
+  } catch(e) {}
+}
+
+/* ========== Raw rules tab ========== */
+async function loadRawRules(versionId) {
+  try {
+    const rules = await apiFetch(`/pricing/api/rules/${versionId}`);
+    const tbody = document.getElementById('rules-body');
+    if (!rules.length) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding:24px">暂无规则</td></tr>'; return; }
+    tbody.innerHTML = rules.map(r => `<tr>
+      <td>${r.category||'-'}</td><td>${r.region||'全部'}</td><td>${r.cargo_type||'全部'}</td>
+      <td><span class="badge badge-info">${r.rule_type}</span></td>
+      <td style="max-width:200px; font-size:0.75rem; word-break:break-all">${JSON.stringify(r.params)}</td>
+      <td><button class="btn btn-danger btn-sm" data-rule-id="${r.id}">删除</button></td>
+    </tr>`).join('');
+  } catch(e) {}
+}
+
+document.addEventListener('click', e => {
+  const del = e.target.closest('[data-rule-id]');
+  if (del) deleteRule(parseInt(del.dataset.ruleId));
+});
+
+async function deleteRule(ruleId) {
+  if (!confirm('确定删除此规则？')) return;
+  try {
+    await apiFetch(`/pricing/api/rules/${ruleId}`, {method:'DELETE'});
+    showToast('已删除','success');
+    if (currentVersionId) loadVersionSummary(currentVersionId);
+  } catch(e) {}
+}
+
+/* ========== Overrides ========== */
+async function loadOverrides() {
+  const cid = document.getElementById('override-customer').value;
+  const container = document.getElementById('overrides-container');
+  if (!cid) { container.innerHTML = '<div class="text-center text-muted" style="padding:40px; font-size:0.85rem">请选择客户</div>'; return; }
+  try {
+    const data = await apiFetch(`/pricing/api/overrides?customer_id=${cid}`);
+    if (!data.length) { container.innerHTML = '<div class="text-center text-muted" style="padding:40px; font-size:0.85rem">该客户暂无定制规则</div>'; return; }
+    container.innerHTML = data.map(o => {
+      const pt = _fmt(o);
+      return `<div class="override-row"><div style="font-weight:600">${o.category||'-'}</div><div>${o.region||'全部'}</div><div>${o.cargo_type||'全部'}</div><div>${pt}</div><div class="text-muted">${o.effective_date||''} ${o.notes||''}</div></div>`;
+    }).join('');
+  } catch(e) {}
+}
+
+function _fmt(o) {
+  const p=o.params||{}, rt=o.rule_type||'';
+  if(rt==='per_kg') return `${p.rate_per_kg||'?'} EUR/kg`;
+  if(rt==='first_extra') return `首${p.first_weight||2}KG: ${p.first_price||'?'}EUR, 续: ${p.extra_per_kg||'?'}EUR/kg`;
+  if(rt==='percentage') return `${((p.rate||0)*100).toFixed(0)}%, 最低 ${p.min_amount||'?'}EUR`;
+  if(rt==='fixed') return `${p.amount||'?'} ${p.currency||'EUR'}/票`;
+  return JSON.stringify(p);
+}
+
+async function saveOverride() {
+  const catCode = getCatCode('o-category');
+  const collected = collectParams('override', catCode);
+  if (!collected) return;
+  try {
+    await apiFetch('/pricing/api/overrides', {method:'POST', body:{
+      customer_id: parseInt(document.getElementById('o-customer').value),
+      category_id: parseInt(document.getElementById('o-category').value),
+      region_id: document.getElementById('o-region').value || null,
+      rule_type: collected.rule_type,
+      params: collected.params,
+      effective_date: document.getElementById('o-date').value || null,
+      notes: document.getElementById('o-notes').value
+    }});
+    showToast('已保存','success');
+    closeModal('modal-override');
+    loadOverrides();
+  } catch(e) {}
+}
+
+/* ========== Init ========== */
+onRuleCategoryChange();
+onOverrideCategoryChange();
+{% if versions %}
+selectVersion({{ versions[0].id }}, '{{ versions[0].name }}');
+{% endif %}
+</script>
+{% endblock %}

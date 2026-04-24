@@ -1,0 +1,47 @@
+# 用户指定的忽略文件和目录
+报价规则/
+反馈客户/
+货况表/
+中介提供/
+
+# 用户指定的具体文件
+汇森国际-东欧COD报价20250121生效.xlsx
+汇森国际-东欧COD报价20251108生效(13).xlsx
+汇森国际-东欧COD报价20260331生效(5).xlsx
+
+# 数据库文件
+web/instance/
+
+# 上传文件目录
+web/uploads/
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.pyc
+
+# 日志文件
+*.log
+logs/
+
+# 临时文件
+*.tmp
+*.temp
+._*
+.DS_Store
+Thumbs.db
+
+# IDE 配置
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 输出文件
+*.out
+_analyze_pricing_out.txt
+analyze_remote_fee_excel_output.txt
