@@ -331,7 +331,15 @@ def calculate_order_fees(order_id, category_codes=None):
     for cat in FeeCategory.query.all():
         cat_cache[cat.code] = cat
 
-    existing_fees = {f.category.code: f for f in OrderFee.query.filter_by(order_id=order.id).all() if f.category}
+    all_fees = OrderFee.query.filter_by(order_id=order.id).all()
+    existing_fees = {}
+    cod_fees = []
+    for f in all_fees:
+        if f.category:
+            if f.category.code == 'COD_FEE':
+                cod_fees.append(f)
+            else:
+                existing_fees[f.category.code] = f
 
     results = []
     for code in target_codes:
@@ -402,6 +410,8 @@ def calculate_order_fees(order_id, category_codes=None):
 
         if code == 'COD_FEE':
             cod_amt = order.cod_amount
+            region_code = order.region.code if order.region else None
+            is_cod_country = region_code in COD_COUNTRIES
 
             override_cod = None
             if order.customer_id:
@@ -419,26 +429,93 @@ def calculate_order_fees(order_id, category_codes=None):
             else:
                 min_amount_cod = 0
 
-            if not cod_amt:
-                amount = min_amount_cod
-                source_note = 'cod_min_precharge'
+            if is_cod_country:
+                if not cod_amt:
+                    amount = min_amount_cod
+                    source_note = 'cod_min_precharge'
+                    
+                    precharge_fee = None
+                    for f in cod_fees:
+                        if f.notes and '预收取' in f.notes:
+                            precharge_fee = f
+                            break
+                    
+                    if not precharge_fee:
+                        precharge_fee = OrderFee(order_id=order.id, category_id=cat.id, input_currency='EUR')
+                        db.session.add(precharge_fee)
+                        cod_fees.append(precharge_fee)
+                    
+                    precharge_fee.calculated_amount = amount
+                    precharge_fee.notes = '预收取（最低费用）'
+                    if exchange_rate:
+                        precharge_fee.exchange_rate = exchange_rate
+                    db.session.flush()
+                    results.append({'category': code, 'amount': amount, 'source': source_note})
+                else:
+                    pct_amount = round(abs(cod_amt) * 0.03, 2)
+                    amount = max(pct_amount, min_amount_cod)
+                    
+                    precharge_fee = None
+                    for f in cod_fees:
+                        if f.notes and '预收取' in f.notes:
+                            precharge_fee = f
+                            break
+                    
+                    if precharge_fee and precharge_fee.calculated_amount is not None:
+                        diff_amount = amount - precharge_fee.calculated_amount
+                        if diff_amount > 0:
+                            difference_fee = OrderFee(order_id=order.id, category_id=cat.id, input_currency='EUR')
+                            db.session.add(difference_fee)
+                            difference_fee.calculated_amount = diff_amount
+                            difference_fee.input_amount = cod_amt
+                            difference_fee.notes = f'差额（实际{amount} - 预收取{precharge_fee.calculated_amount}）'
+                            if exchange_rate:
+                                difference_fee.exchange_rate = exchange_rate
+                            db.session.flush()
+                            results.append({'category': code, 'amount': diff_amount, 'source': 'cod_difference'})
+                        else:
+                            results.append({'category': code, 'amount': 0, 'source': 'cod_no_difference'})
+                    else:
+                        calculated_fee = None
+                        for f in cod_fees:
+                            if not f.notes or '预收取' not in f.notes:
+                                calculated_fee = f
+                                break
+                        
+                        if not calculated_fee:
+                            calculated_fee = OrderFee(order_id=order.id, category_id=cat.id, input_currency='EUR')
+                            db.session.add(calculated_fee)
+                        
+                        calculated_fee.calculated_amount = amount
+                        calculated_fee.input_amount = cod_amt
+                        calculated_fee.notes = '实际计算'
+                        if exchange_rate:
+                            calculated_fee.exchange_rate = exchange_rate
+                        db.session.flush()
+                        results.append({'category': code, 'amount': amount, 'source': 'cod_calculated'})
             else:
+                if not cod_amt:
+                    continue
+                
                 pct_amount = round(abs(cod_amt) * 0.03, 2)
                 amount = max(pct_amount, min_amount_cod)
-                source_note = 'cod_calculated'
-
-            fee = existing_fees.get(code)
-            if not fee:
-                fee = OrderFee(order_id=order.id, category_id=cat.id, input_currency='EUR')
-                db.session.add(fee)
-            fee.calculated_amount = amount
-            if cod_amt:
-                fee.input_amount = cod_amt
-            if exchange_rate:
-                fee.exchange_rate = exchange_rate
-            db.session.flush()
-            existing_fees[code] = fee
-            results.append({'category': code, 'amount': amount, 'source': source_note})
+                
+                calculated_fee = None
+                for f in cod_fees:
+                    calculated_fee = f
+                    break
+                
+                if not calculated_fee:
+                    calculated_fee = OrderFee(order_id=order.id, category_id=cat.id, input_currency='EUR')
+                    db.session.add(calculated_fee)
+                
+                calculated_fee.calculated_amount = amount
+                calculated_fee.input_amount = cod_amt
+                calculated_fee.notes = '实际计算'
+                if exchange_rate:
+                    calculated_fee.exchange_rate = exchange_rate
+                db.session.flush()
+                results.append({'category': code, 'amount': amount, 'source': 'cod_calculated'})
             continue
 
         override = None
