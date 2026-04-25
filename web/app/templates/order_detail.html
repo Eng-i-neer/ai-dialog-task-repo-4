@@ -173,30 +173,65 @@
     {% set all_fee_codes = ['HEAD_FREIGHT', 'TAIL_FREIGHT', 'COD_FEE', 'RETURN_FEE', 'SHELF_FEE', 'VAT', 'F_SURCHARGE', 'REMOTE_FEE', 'SECOND_DELIVERY'] %}
     {% set fee_names = {'HEAD_FREIGHT':'头程运费', 'TAIL_FREIGHT':'尾程运费', 'COD_FEE':'COD手续费', 'RETURN_FEE':'退件操作费', 'SHELF_FEE':'上架费', 'VAT':'增值税', 'F_SURCHARGE':'附加费', 'REMOTE_FEE':'偏远费', 'SECOND_DELIVERY':'二次派送费'} %}
     {% for code in all_fee_codes %}
-      {% set ns = namespace(found=false, amount=none, period='') %}
-      {% for fee in fees %}
-        {% if fee.category and fee.category.code == code %}
-          {% set ns.found = true %}
-          {% set this_amt = fee.override_amount if fee.override_amount is not none else fee.calculated_amount %}
-          {% if this_amt is not none %}
-            {% set ns.amount = this_amt %}
-            {% set ns.period = fee.period_label or '' %}
+      {% if code == 'COD_FEE' %}
+        {% set cod_fees = [] %}
+        {% for fee in fees %}
+          {% if fee.category and fee.category.code == code %}
+            {% set _ = cod_fees.append(fee) %}
           {% endif %}
+        {% endfor %}
+        
+        {% if cod_fees %}
+          {% for fee in cod_fees %}
+            {% set this_amt = fee.override_amount if fee.override_amount is not none else fee.calculated_amount %}
+            <div class="status-item">
+              <span class="status-name">
+                {{ fee_names.get(code, code) }}
+                {% if fee.notes %}<span style="font-size:0.7rem; color:var(--text-muted); margin-left:4px;">({{ fee.notes }})</span>{% endif %}
+              </span>
+              <span>
+                {% if this_amt is not none %}
+                  <span class="status-val collected">{{ '%.2f'|format(this_amt) }}</span>
+                  {% if fee.period_label %}<span class="status-period">{{ fee.period_label }}导入</span>{% endif %}
+                {% else %}
+                  <span class="status-val pending">待计算</span>
+                {% endif %}
+              </span>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="status-item">
+            <span class="status-name">{{ fee_names.get(code, code) }}</span>
+            <span><span class="status-val pending">未收取</span></span>
+          </div>
         {% endif %}
-      {% endfor %}
-      <div class="status-item">
-        <span class="status-name">{{ fee_names.get(code, code) }}</span>
-        <span>
-          {% if ns.found and ns.amount is not none %}
-            <span class="status-val collected">{{ '%.2f'|format(ns.amount) }}</span>
-            {% if ns.period %}<span class="status-period">{{ ns.period }}导入</span>{% endif %}
-          {% elif ns.found %}
-            <span class="status-val pending">待计算</span>
-          {% else %}
-            <span class="status-val pending">未收取</span>
+      {% else %}
+        {% set ns = namespace(found=false, amount=none, period='', notes='') %}
+        {% for fee in fees %}
+          {% if fee.category and fee.category.code == code %}
+            {% set ns.found = true %}
+            {% set this_amt = fee.override_amount if fee.override_amount is not none else fee.calculated_amount %}
+            {% if this_amt is not none %}
+              {% set ns.amount = this_amt %}
+              {% set ns.period = fee.period_label or '' %}
+              {% set ns.notes = fee.notes or '' %}
+            {% endif %}
           {% endif %}
-        </span>
-      </div>
+        {% endfor %}
+        <div class="status-item">
+          <span class="status-name">{{ fee_names.get(code, code) }}{% if ns.notes %}<span style="font-size:0.7rem; color:var(--text-muted); margin-left:4px;">({{ ns.notes }})</span>{% endif %}</span>
+          <span>
+            {% if ns.found and ns.amount is not none %}
+              <span class="status-val collected">{{ '%.2f'|format(ns.amount) }}</span>
+              {% if ns.period %}<span class="status-period">{{ ns.period }}导入</span>{% endif %}
+            {% elif ns.found %}
+              <span class="status-val pending">待计算</span>
+            {% else %}
+              <span class="status-val pending">未收取</span>
+            {% endif %}
+          </span>
+        </div>
+      {% endif %}
     {% endfor %}
   </div>
 </div>

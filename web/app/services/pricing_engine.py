@@ -429,6 +429,10 @@ def calculate_order_fees(order_id, category_codes=None):
             else:
                 min_amount_cod = 0
 
+            first_period = order.bill_period.strftime('%Y%m%d') if order.bill_period else None
+            period_list = order.import_period_list
+            latest_period = period_list[-1] if period_list else first_period
+
             if is_cod_country:
                 if not cod_amt:
                     amount = min_amount_cod
@@ -447,6 +451,8 @@ def calculate_order_fees(order_id, category_codes=None):
                     
                     precharge_fee.calculated_amount = amount
                     precharge_fee.notes = '预收取（最低费用）'
+                    if first_period:
+                        precharge_fee.import_period = first_period
                     if exchange_rate:
                         precharge_fee.exchange_rate = exchange_rate
                     db.session.flush()
@@ -469,6 +475,8 @@ def calculate_order_fees(order_id, category_codes=None):
                             difference_fee.calculated_amount = diff_amount
                             difference_fee.input_amount = cod_amt
                             difference_fee.notes = f'差额（实际{amount} - 预收取{precharge_fee.calculated_amount}）'
+                            if latest_period:
+                                difference_fee.import_period = latest_period
                             if exchange_rate:
                                 difference_fee.exchange_rate = exchange_rate
                             db.session.flush()
@@ -489,6 +497,8 @@ def calculate_order_fees(order_id, category_codes=None):
                         calculated_fee.calculated_amount = amount
                         calculated_fee.input_amount = cod_amt
                         calculated_fee.notes = '实际计算'
+                        if latest_period:
+                            calculated_fee.import_period = latest_period
                         if exchange_rate:
                             calculated_fee.exchange_rate = exchange_rate
                         db.session.flush()
@@ -512,6 +522,8 @@ def calculate_order_fees(order_id, category_codes=None):
                 calculated_fee.calculated_amount = amount
                 calculated_fee.input_amount = cod_amt
                 calculated_fee.notes = '实际计算'
+                if latest_period:
+                    calculated_fee.import_period = latest_period
                 if exchange_rate:
                     calculated_fee.exchange_rate = exchange_rate
                 db.session.flush()
