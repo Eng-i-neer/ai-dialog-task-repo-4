@@ -204,11 +204,34 @@
 <div class="three-col">
   <div class="card col-card">
     <h3>导入科目</h3>
-    <div class="col-desc">该订单出现在代理账单中的哪些科目表</div>
-    {% set sheets = order.import_sheet_list %}
-    {% if sheets %}
-      {% for s in sheets %}
-        <span class="sheet-tag">{{ s }}</span>
+    <div class="col-desc">该订单出现在代理账单中的哪些科目表（按期号分组）</div>
+    
+    {% if order.import_period_list %}
+      {% for period in order.import_period_list %}
+        {% set period_sheets = [] %}
+        {% for fee in fees %}
+          {% if fee.import_period == period and fee.source_sheet %}
+            {% set _ = period_sheets.append(fee.source_sheet) %}
+          {% endif %}
+        {% endfor %}
+        
+        {% if not period_sheets %}
+          {% set period_sheets = order.import_sheet_list %}
+        {% endif %}
+        
+        <div style="margin-bottom:12px; padding:10px; background:var(--bg-subtle, #f8f8f8); border-radius:var(--radius);">
+          <div style="font-weight:700; font-size:0.8rem; margin-bottom:6px;">
+            <span class="period-tag">{{ period }}期</span>
+            {% if loop.last %}<span style="color:#E65100; font-size:0.72rem; margin-left:6px;">(最新)</span>{% endif %}
+          </div>
+          {% if period_sheets %}
+            {% for s in period_sheets|unique %}
+              <span class="sheet-tag">{{ s }}</span>
+            {% endfor %}
+          {% else %}
+            <span style="color:var(--text-muted); font-size:0.8rem">无科目记录</span>
+          {% endif %}
+        </div>
       {% endfor %}
     {% else %}
       <span style="color:var(--text-muted); font-size:0.82rem">未记录来源表</span>
