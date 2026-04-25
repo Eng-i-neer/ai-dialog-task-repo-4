@@ -236,9 +236,9 @@ class OrderFee(db.Model):
 
     @property
     def period_label(self):
-        """Human-readable period label like '0728期'."""
+        """Human-readable period label like '20250728期'."""
         if self.import_period:
-            return f"{self.import_period[4:]}期"
+            return f"{self.import_period}期"
         return None
 
     def to_dict(self):
